@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it-task-lists@2.1.1/index.min.js"></script>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.12.0/+esm';
+
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: 'default'
+    });
+
+    const md = window.markdownit({
+      html: false,
+      linkify: true,
+      typographer: true,
+      breaks: false
+    });
+
+    if (window.markdownitTaskLists) {
+      md.use(window.markdownitTaskLists, { enabled: false, label: true, labelAfter: true });
+    }
+
+    async function renderMermaidBlocks() {
+      const blocks = Array.from(document.querySelectorAll('pre code.language-mermaid'));
+      for (const block of blocks) {
+        const src = block.textContent || '';
+        const parentPre = block.closest('pre');
+        if (!parentPre) {
+          continue;
+        }
+
+        const holder = document.createElement('div');
+        holder.className = 'mermaid';
+        holder.textContent = src;
+        parentPre.replaceWith(holder);
+      }
+
+      if (blocks.length > 0) {
+        try {
+          await mermaid.run({ querySelector: '.mermaid' });
+        } catch (err) {
+          console.error('Mermaid render failed:', err);
+        }
+      }
+    }
+
+    function renderMath() {
+      if (!window.renderMathInElement) {
+        return;
+      }
+      window.renderMathInElement(document.getElementById('content'), {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+          { left: '\\(', right: '\\)', display: false },
+          { left: '\\[', right: '\\]', display: true }
+        ],
+        throwOnError: false
+      });
+    }
+
+    async function renderMarkdown(markdown) {
+      const html = md.render(markdown || '');
+      const content = document.getElementById('content');
+      content.innerHTML = html;
+      renderMath();
+      await renderMermaidBlocks();
+    }
+
+    window.renderMarkdown = renderMarkdown;
+    window.addEventListener('DOMContentLoaded', () => renderMarkdown(''));
+  </script>
+</head>
+<body>
+  <main id="content"></main>
+</body>
+</html>
