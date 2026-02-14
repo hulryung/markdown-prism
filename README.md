@@ -27,6 +27,14 @@ A native macOS Markdown viewer & editor with live preview, Quick Look support, a
 
 ## Install
 
+### Homebrew
+
+```bash
+brew install hulryung/tap/markdown-prism
+```
+
+### Manual
+
 Download the latest `MarkdownPrism-x.x.x.dmg` from [Releases](../../releases), open it, and drag **Markdown Prism** to Applications.
 
 The app is signed and notarized with Apple Developer ID.
