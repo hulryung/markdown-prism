@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css" media="(prefers-color-scheme: light)">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
@@ -12,17 +15,35 @@
   <script type="module">
     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.12.0/+esm';
 
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
     mermaid.initialize({
       startOnLoad: false,
       securityLevel: 'strict',
-      theme: 'default'
+      theme: prefersDark.matches ? 'dark' : 'default'
+    });
+
+    prefersDark.addEventListener('change', (e) => {
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'strict',
+        theme: e.matches ? 'dark' : 'default'
+      });
     });
 
     const md = window.markdownit({
       html: false,
       linkify: true,
       typographer: true,
-      breaks: false
+      breaks: false,
+      highlight: function (str, lang) {
+        if (lang && window.hljs && hljs.getLanguage(lang)) {
+          try { return hljs.highlight(str, { language: lang }).value; } catch (_) {}
+        }
+        if (window.hljs) {
+          try { return hljs.highlightAuto(str).value; } catch (_) {}
+        }
+        return '';
+      }
     });
 
     if (window.markdownitTaskLists) {
