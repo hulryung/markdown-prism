@@ -273,7 +273,7 @@ markdown-it의 strikethrough는 기본 비활성. `{ breaks: false }` 설정은 
 ## 8. 실행 방법
 
 ```bash
-cd /Users/dkkang/dev/markdown-viewer
+cd markdown-viewer
 swift build
 swift run
 ```
