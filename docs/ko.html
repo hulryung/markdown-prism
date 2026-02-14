@@ -19,12 +19,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
 </head>
 <body>
     <header>
         <nav class="container">
             <div class="logo">
                 <i class="fas fa-prism"></i> <span>Markdown Prism</span>
+            </div>
+            <div class="mobile-toggle">
+                <i class="fas fa-bars"></i>
             </div>
             <ul class="nav-links">
                 <li><a href="#features">기능</a></li>
@@ -43,7 +47,7 @@
     <main>
         <section class="hero">
             <div class="container hero-grid">
-                <div class="hero-content">
+                <div class="hero-content" data-aos="fade-up">
                     <span class="badge">macOS 전용 네이티브 앱</span>
                     <h1>가장 우아한 방식의<br>마크다운 경험</h1>
                     <p>Markdown Prism은 개발자와 작가를 위한 빠르고 가벼운 macOS 전용 마크다운 뷰어이자 에디터입니다. GFM, LaTeX 수식, Mermaid 다이어그램을 완벽하게 지원합니다.</p>
@@ -52,7 +56,7 @@
                         <a href="https://github.com/hulryung/markdown-prism" class="btn-secondary btn-large"><i class="fab fa-github"></i> GitHub에서 보기</a>
                     </div>
                 </div>
-                <div class="hero-image">
+                <div class="hero-image" data-aos="fade-left" data-aos-delay="200">
                     <div class="app-mockup">
                         <div class="window-controls">
                             <span class="close"></span>
@@ -67,37 +71,37 @@
 
         <section id="features" class="features">
             <div class="container">
-                <div class="section-header">
+                <div class="section-header" data-aos="fade-up">
                     <h2>생산성을 높이는 강력한 기능</h2>
                     <p>Markdown Prism은 당신의 워크플로우를 방해하지 않으면서 필요한 모든 도구를 제공합니다.</p>
                 </div>
                 <div class="features-grid">
-                    <div class="feature-card">
+                    <div class="feature-card" data-aos="fade-up" data-aos-delay="100">
                         <div class="icon"><i class="fas fa-bolt"></i></div>
                         <h3>실시간 미리보기</h3>
                         <p>입력과 동시에 오른쪽 프리뷰 화면에서 결과물을 바로 확인하세요. 400ms 디바운싱으로 쾌적한 편집 경험을 제공합니다.</p>
                     </div>
-                    <div class="feature-card">
+                    <div class="feature-card" data-aos="fade-up" data-aos-delay="200">
                         <div class="icon"><i class="fas fa-square-root-variable"></i></div>
                         <h3>고급 렌더링</h3>
                         <p>KaTeX를 통한 고품질 수식 렌더링과 Mermaid를 이용한 복잡한 다이어그램 및 순서도를 지원합니다.</p>
                     </div>
-                    <div class="feature-card">
+                    <div class="feature-card" data-aos="fade-up" data-aos-delay="300">
                         <div class="icon"><i class="fas fa-code"></i></div>
                         <h3>구문 하이라이팅</h3>
                         <p>180개 이상의 언어를 지원하는 highlight.js가 내장되어 있어, 어떤 코드 블록도 아름답게 표시합니다.</p>
                     </div>
-                    <div class="feature-card">
+                    <div class="feature-card" data-aos="fade-up" data-aos-delay="100">
                         <div class="icon"><i class="fas fa-eye"></i></div>
                         <h3>QuickLook 지원</h3>
                         <p>앱을 열지 않고도 Finder에서 스페이스바를 눌러 마크다운 파일의 내용을 즉시 미리볼 수 있습니다.</p>
                     </div>
-                    <div class="feature-card">
+                    <div class="feature-card" data-aos="fade-up" data-aos-delay="200">
                         <div class="icon"><i class="fas fa-wifi-slash"></i></div>
                         <h3>오프라인 지원</h3>
                         <p>모든 필수 라이브러리가 앱 내에 번들링되어 있어, 인터넷 연결 없이도 모든 기능을 완벽하게 사용할 수 있습니다.</p>
                     </div>
-                    <div class="feature-card">
+                    <div class="feature-card" data-aos="fade-up" data-aos-delay="300">
                         <div class="icon"><i class="fas fa-file-export"></i></div>
                         <h3>파일 자동 감시</h3>
                         <p>외부 에디터에서 파일을 수정하면 Markdown Prism이 이를 감지하고 실시간으로 내용을 업데이트합니다.</p>
@@ -109,7 +113,7 @@
         <section class="editor-showcase">
             <div class="container">
                 <div class="showcase-content">
-                    <div class="image-side">
+                    <div class="image-side" data-aos="fade-right">
                         <div class="app-mockup">
                             <div class="window-controls">
                                 <span class="close"></span>
@@ -119,7 +123,7 @@
                             <img src="assets/images/editor.png" alt="Native Editor" class="app-screenshot-img">
                         </div>
                     </div>
-                    <div class="text-side">
+                    <div class="text-side" data-aos="fade-left">
                         <h2>강력한 네이티브 에디터</h2>
                         <p>단순한 뷰어를 넘어선 강력한 편집 기능을 제공합니다. macOS의 네이티브 텍스트 엔진을 활용하여 부드럽고 정확한 타이핑 경험을 제공하며, 마크다운 구문 강조를 통해 가독성을 높였습니다.</p>
                         <ul class="check-list">
@@ -136,7 +140,7 @@
         <section id="preview" class="demo">
             <div class="container">
                 <div class="demo-content">
-                    <div class="text-side">
+                    <div class="text-side" data-aos="fade-right">
                         <h2>수식부터 다이어그램까지</h2>
                         <p>복잡한 논문 작업이나 기술 문서를 작성하시나요? Markdown Prism은 가장 까다로운 요구사항도 충족합니다.</p>
                         <ul class="check-list">
@@ -146,7 +150,7 @@
                             <li><i class="fas fa-check"></i> 다크 모드 완벽 대응</li>
                         </ul>
                     </div>
-                    <div class="image-side">
+                    <div class="image-side" data-aos="fade-left">
                         <div class="demo-image-container">
                             <img src="assets/images/demo.png" alt="Markdown Prism Demo" class="demo-screenshot-img">
                         </div>
@@ -157,12 +161,12 @@
 
         <section id="installation" class="installation">
             <div class="container">
-                <div class="section-header">
+                <div class="section-header" data-aos="fade-up">
                     <h2>설치 방법</h2>
                     <p>몇 단계만으로 Markdown Prism을 설치하고 바로 사용할 수 있습니다.</p>
                 </div>
                 <div class="install-steps">
-                    <div class="step">
+                    <div class="step" data-aos="zoom-in" data-aos-delay="100">
                         <div class="step-number"><i class="fas fa-terminal"></i></div>
                         <h3>Homebrew 설치</h3>
                         <p>터미널에서 아래 명령어를 입력하여 간편하게 설치할 수 있습니다.</p>
@@ -170,25 +174,25 @@
                             <code>brew install hulryung/tap/markdown-prism</code>
                         </div>
                     </div>
-                    <div class="step">
+                    <div class="step" data-aos="zoom-in" data-aos-delay="200">
                         <div class="step-number">1</div>
                         <h3>DMG 다운로드</h3>
                         <p>직접 설치를 원하시면 아래 다운로드 버튼을 클릭하여 DMG 파일을 받으세요.</p>
                     </div>
-                    <div class="step">
+                    <div class="step" data-aos="zoom-in" data-aos-delay="300">
                         <div class="step-number">2</div>
                         <h3>응용 프로그램으로 이동</h3>
                         <p>DMG 파일을 열고 Markdown Prism 아이콘을 Applications 폴더로 드래그하세요.</p>
                     </div>
                 </div>
-                <div class="install-note">
+                <div class="install-note" data-aos="fade-up">
                     <p><i class="fas fa-info-circle"></i> <strong>참고:</strong> 확인되지 않은 개발자 메시지가 표시될 경우, <code>System Settings > Privacy & Security</code>에서 실행을 허용해 주세요.</p>
                 </div>
             </div>
         </section>
 
         <section id="download" class="cta">
-            <div class="container">
+            <div class="container" data-aos="zoom-in">
                 <div class="cta-box">
                     <span class="version-badge">Latest Version: v0.1.0</span>
                     <h2>지금 바로 시작하세요</h2>
@@ -261,5 +265,36 @@
             <p>&copy; 2026 Markdown Prism. All rights reserved.</p>
         </div>
     </footer>
+    <a href="#" id="back-to-top"><i class="fas fa-chevron-up"></i></a>
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+        AOS.init({
+            duration: 800,
+            once: true,
+            offset: 100
+        });
+
+        // Mobile Menu Toggle
+        const toggle = document.querySelector('.mobile-toggle');
+        const nav = document.querySelector('.nav-links');
+        
+        if(toggle) {
+            toggle.addEventListener('click', () => {
+                nav.classList.toggle('active');
+                toggle.querySelector('i').classList.toggle('fa-bars');
+                toggle.querySelector('i').classList.toggle('fa-times');
+            });
+        }
+
+        // Back to Top Visibility
+        const backToTop = document.getElementById('back-to-top');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 300) {
+                backToTop.classList.add('visible');
+            } else {
+                backToTop.classList.remove('visible');
+            }
+        });
+    </script>
 </body>
 </html>

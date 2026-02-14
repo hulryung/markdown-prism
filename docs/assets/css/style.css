@@ -553,9 +553,88 @@ footer {
     color: var(--text-muted);
 }
 
+/* Mobile Toggle */
+.mobile-toggle {
+    display: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text);
+}
+
+.nav-links.active {
+    display: flex !important;
+    position: fixed;
+    top: 4rem;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: white;
+    flex-direction: column;
+    padding: 2rem;
+    gap: 2rem;
+    z-index: 999;
+}
+
+/* Back to Top */
+#back-to-top {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 3rem;
+    height: 3rem;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    box-shadow: var(--shadow);
+    opacity: 0;
+    transition: all 0.3s ease;
+    z-index: 100;
+}
+
+#back-to-top.visible {
+    opacity: 1;
+}
+
+/* Hero Section */
+.hero {
+    padding: 10rem 0 6rem;
+    background: radial-gradient(circle at top right, rgba(0, 113, 227, 0.05), transparent 40%),
+                radial-gradient(circle at bottom left, rgba(0, 113, 227, 0.05), transparent 40%);
+}
+
+.hero-image {
+    perspective: 1000px;
+}
+
+.app-mockup {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 50px 100px rgba(0,0,0,0.15);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    transform: rotateY(-5deg) rotateX(2deg);
+    transition: transform 0.5s ease;
+}
+
+.app-mockup:hover {
+    transform: rotateY(0deg) rotateX(0deg);
+}
+
 /* Mobile Responsive */
 @media (max-width: 968px) {
-    .hero-grid, .demo-content {
+    .mobile-toggle {
+        display: block;
+    }
+
+    .nav-links {
+        display: none;
+    }
+
+    .hero-grid, .demo-content, .showcase-content {
         grid-template-columns: 1fr;
         text-align: center;
     }
@@ -565,14 +644,15 @@ footer {
     }
 
     h1 {
-        font-size: 2.5rem;
+        font-size: 2.8rem;
     }
 
     .hero-image {
         order: -1;
+        margin-bottom: 3rem;
     }
 
-    .nav-links li:not(:last-child) {
-        display: none;
+    .app-mockup {
+        transform: none;
     }
 }

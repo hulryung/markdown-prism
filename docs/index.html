@@ -30,12 +30,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
 </head>
 <body>
     <header>
         <nav class="container">
             <div class="logo">
                 <i class="fas fa-prism"></i> <span>Markdown Prism</span>
+            </div>
+            <div class="mobile-toggle">
+                <i class="fas fa-bars"></i>
             </div>
             <ul class="nav-links">
                 <li><a href="#features">Features</a></li>
@@ -53,7 +57,7 @@
     <main>
         <section class="hero">
             <div class="container hero-grid">
-                <div class="hero-content">
+                <div class="hero-content" data-aos="fade-up">
                     <span class="badge">Native macOS App</span>
                     <h1>The Most Elegant Way to<br>Experience Markdown</h1>
                     <p>Markdown Prism is a fast, lightweight macOS-native Markdown viewer and editor. Built for developers and writers, with full support for GFM, LaTeX, and Mermaid.</p>
@@ -62,7 +66,7 @@
                         <a href="https://github.com/hulryung/markdown-prism" class="btn-secondary btn-large"><i class="fab fa-github"></i> View on GitHub</a>
                     </div>
                 </div>
-                <div class="hero-image">
+                <div class="hero-image" data-aos="fade-left" data-aos-delay="200">
                     <div class="app-mockup">
                         <div class="window-controls">
                             <span class="close"></span>
@@ -77,37 +81,37 @@
 
         <section id="features" class="features">
             <div class="container">
-                <div class="section-header">
+                <div class="section-header" data-aos="fade-up">
                     <h2>Powerful Features for Productivity</h2>
                     <p>Markdown Prism provides all the tools you need without getting in your way.</p>
                 </div>
                 <div class="features-grid">
-                    <div class="feature-card">
+                    <div class="feature-card" data-aos="fade-up" data-aos-delay="100">
                         <div class="icon"><i class="fas fa-bolt"></i></div>
                         <h3>Live Preview</h3>
                         <p>See your changes instantly with a side-by-side preview. 400ms debouncing ensures a smooth editing experience.</p>
                     </div>
-                    <div class="feature-card">
+                    <div class="feature-card" data-aos="fade-up" data-aos-delay="200">
                         <div class="icon"><i class="fas fa-square-root-variable"></i></div>
                         <h3>Rich Rendering</h3>
                         <p>High-quality math rendering via KaTeX and complex diagrams/flowcharts with Mermaid.js.</p>
                     </div>
-                    <div class="feature-card">
+                    <div class="feature-card" data-aos="fade-up" data-aos-delay="300">
                         <div class="icon"><i class="fas fa-code"></i></div>
                         <h3>Syntax Highlighting</h3>
                         <p>Built-in highlight.js supporting 180+ languages to make your code blocks look beautiful.</p>
                     </div>
-                    <div class="feature-card">
+                    <div class="feature-card" data-aos="fade-up" data-aos-delay="100">
                         <div class="icon"><i class="fas fa-eye"></i></div>
                         <h3>QuickLook Support</h3>
                         <p>Preview Markdown files instantly in Finder by pressing the spacebar, without opening the app.</p>
                     </div>
-                    <div class="feature-card">
+                    <div class="feature-card" data-aos="fade-up" data-aos-delay="200">
                         <div class="icon"><i class="fas fa-wifi-slash"></i></div>
                         <h3>Offline Support</h3>
                         <p>All essential libraries are bundled within the app. Works perfectly without an internet connection.</p>
                     </div>
-                    <div class="feature-card">
+                    <div class="feature-card" data-aos="fade-up" data-aos-delay="300">
                         <div class="icon"><i class="fas fa-file-export"></i></div>
                         <h3>File Watching</h3>
                         <p>Automatically detects external changes and refreshes the content in real-time.</p>
@@ -119,7 +123,7 @@
         <section class="editor-showcase">
             <div class="container">
                 <div class="showcase-content">
-                    <div class="image-side">
+                    <div class="image-side" data-aos="fade-right">
                         <div class="app-mockup">
                             <div class="window-controls">
                                 <span class="close"></span>
@@ -129,7 +133,7 @@
                             <img src="assets/images/editor.png" alt="Native Editor" class="app-screenshot-img">
                         </div>
                     </div>
-                    <div class="text-side">
+                    <div class="text-side" data-aos="fade-left">
                         <h2>Powerful Native Editor</h2>
                         <p>Beyond a simple viewer. Leverages the native macOS text engine for smooth typing, featuring Markdown syntax highlighting for better readability.</p>
                         <ul class="check-list">
@@ -146,7 +150,7 @@
         <section id="preview" class="demo">
             <div class="container">
                 <div class="demo-content">
-                    <div class="text-side">
+                    <div class="text-side" data-aos="fade-right">
                         <h2>From Math to Diagrams</h2>
                         <p>Working on academic papers or technical docs? Markdown Prism meets the most demanding requirements.</p>
                         <ul class="check-list">
@@ -156,7 +160,7 @@
                             <li><i class="fas fa-check"></i> Perfect Dark Mode support</li>
                         </ul>
                     </div>
-                    <div class="image-side">
+                    <div class="image-side" data-aos="fade-left">
                         <div class="demo-image-container">
                             <img src="assets/images/demo.png" alt="Markdown Prism Demo" class="demo-screenshot-img">
                         </div>
@@ -167,12 +171,12 @@
 
         <section id="installation" class="installation">
             <div class="container">
-                <div class="section-header">
+                <div class="section-header" data-aos="fade-up">
                     <h2>Installation</h2>
                     <p>Get Markdown Prism up and running in just a few steps.</p>
                 </div>
                 <div class="install-steps">
-                    <div class="step">
+                    <div class="step" data-aos="zoom-in" data-aos-delay="100">
                         <div class="step-number"><i class="fas fa-terminal"></i></div>
                         <h3>Homebrew</h3>
                         <p>Install easily via terminal with a single command.</p>
@@ -180,25 +184,25 @@
                             <code>brew install hulryung/tap/markdown-prism</code>
                         </div>
                     </div>
-                    <div class="step">
+                    <div class="step" data-aos="zoom-in" data-aos-delay="200">
                         <div class="step-number">1</div>
                         <h3>Download DMG</h3>
                         <p>Or download the DMG file directly from our releases page.</p>
                     </div>
-                    <div class="step">
+                    <div class="step" data-aos="zoom-in" data-aos-delay="300">
                         <div class="step-number">2</div>
                         <h3>Move to Applications</h3>
                         <p>Open the DMG and drag the Markdown Prism icon to your Applications folder.</p>
                     </div>
                 </div>
-                <div class="install-note">
+                <div class="install-note" data-aos="fade-up">
                     <p><i class="fas fa-info-circle"></i> <strong>Note:</strong> If you see an "Unidentified Developer" message, please allow it in <code>System Settings > Privacy & Security</code>.</p>
                 </div>
             </div>
         </section>
 
         <section id="download" class="cta">
-            <div class="container">
+            <div class="container" data-aos="zoom-in">
                 <div class="cta-box">
                     <span class="version-badge">Latest Version: v0.1.0</span>
                     <h2>Get Started Now</h2>
@@ -271,5 +275,36 @@
             <p>&copy; 2026 Markdown Prism. All rights reserved.</p>
         </div>
     </footer>
+    <a href="#" id="back-to-top"><i class="fas fa-chevron-up"></i></a>
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+        AOS.init({
+            duration: 800,
+            once: true,
+            offset: 100
+        });
+        
+        // Mobile Menu Toggle
+        const toggle = document.querySelector('.mobile-toggle');
+        const nav = document.querySelector('.nav-links');
+        
+        if(toggle) {
+            toggle.addEventListener('click', () => {
+                nav.classList.toggle('active');
+                toggle.querySelector('i').classList.toggle('fa-bars');
+                toggle.querySelector('i').classList.toggle('fa-times');
+            });
+        }
+
+        // Back to Top Visibility
+        const backToTop = document.getElementById('back-to-top');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 300) {
+                backToTop.classList.add('visible');
+            } else {
+                backToTop.classList.remove('visible');
+            }
+        });
+    </script>
 </body>
 </html>
