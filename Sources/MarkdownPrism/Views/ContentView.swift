@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var showEditor = true
     @State private var debounceWork: DispatchWorkItem?
     @State private var isModified = false
+    @State private var ignoreNextTextChange = false
 
     var body: some View {
         HSplitView {
@@ -37,7 +38,7 @@ struct ContentView: View {
                 .keyboardShortcut("o", modifiers: .command)
             }
             ToolbarItem(placement: .automatic) {
-                Button(action: saveFile) {
+                Button(action: { _ = saveFile() }) {
                     Label("Save", systemImage: "square.and.arrow.down")
                 }
                 .keyboardShortcut("s", modifiers: .command)
@@ -60,12 +61,16 @@ struct ContentView: View {
             debounceWork?.cancel()
         }
         .onChange(of: markdownText) {
+            if ignoreNextTextChange {
+                ignoreNextTextChange = false
+                return
+            }
             schedulePreviewUpdate(markdownText)
         }
         .focusedSceneValue(\.newFileAction, { newFileAction() })
         .focusedSceneValue(\.openFileAction, { openFile() })
-        .focusedSceneValue(\.saveFileAction, isModified ? { saveFile() } : nil)
-        .focusedSceneValue(\.saveAsFileAction, { saveAsFile() })
+        .focusedSceneValue(\.saveFileAction, isModified ? { _ = saveFile() } : nil)
+        .focusedSceneValue(\.saveAsFileAction, { _ = saveAsFile() })
     }
 
     private var windowTitle: String {
@@ -73,6 +78,13 @@ struct ContentView: View {
             return "Markdown Prism"
         }
         return isModified ? "\(name) \u{2014} Edited" : name
+    }
+
+    private func setDocumentText(_ text: String, modified: Bool) {
+        ignoreNextTextChange = true
+        markdownText = text
+        previewText = text
+        isModified = modified
     }
 
     private func schedulePreviewUpdate(_ text: String) {
@@ -94,9 +106,7 @@ struct ContentView: View {
         fileWatcher?.stop()
         fileWatcher = nil
         fileURL = nil
-        markdownText = ""
-        previewText = ""
-        isModified = false
+        setDocumentText("", modified: false)
     }
 
     private func openFile() {
@@ -118,15 +128,14 @@ struct ContentView: View {
         }
     }
 
-    private func saveFile() {
+    private func saveFile() -> Bool {
         guard let fileURL else {
-            saveAsFile()
-            return
+            return saveAsFile()
         }
-        writeFile(to: fileURL)
+        return writeFile(to: fileURL)
     }
 
-    private func saveAsFile() {
+    private func saveAsFile() -> Bool {
         let panel = NSSavePanel()
         if let markdownType = UTType(filenameExtension: "md") {
             panel.allowedContentTypes = [markdownType]
@@ -136,25 +145,34 @@ struct ContentView: View {
         panel.nameFieldStringValue = fileURL?.lastPathComponent ?? "Untitled.md"
         panel.message = "Save Markdown file"
 
-        if panel.runModal() == .OK, let url = panel.url {
-            writeFile(to: url)
-            if url != fileURL {
-                fileURL = url
-                startWatchingFile(at: url, forceRestart: true)
-            }
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return false
         }
+
+        guard writeFile(to: url) else {
+            return false
+        }
+
+        if url != fileURL {
+            fileURL = url
+            startWatchingFile(at: url, forceRestart: true)
+        }
+
+        return true
     }
 
-    private func writeFile(to url: URL) {
+    private func writeFile(to url: URL) -> Bool {
         do {
             try markdownText.write(to: url, atomically: true, encoding: .utf8)
             isModified = false
+            return true
         } catch {
             let alert = NSAlert()
             alert.messageText = "Save Failed"
             alert.informativeText = error.localizedDescription
             alert.alertStyle = .warning
             alert.runModal()
+            return false
         }
     }
 
@@ -170,8 +188,7 @@ struct ContentView: View {
         let response = alert.runModal()
         switch response {
         case .alertFirstButtonReturn:
-            saveFile()
-            return true
+            return saveFile()
         case .alertSecondButtonReturn:
             return true
         default:
@@ -183,14 +200,12 @@ struct ContentView: View {
         let previousURL = fileURL
         do {
             let document = try MarkdownDocument(fileURL: url)
-            markdownText = document.text
-            previewText = document.text
+            setDocumentText(document.text, modified: false)
             fileURL = url
-            isModified = false
             startWatchingFile(at: url, forceRestart: previousURL != url)
         } catch {
-            markdownText = "Error loading file: \(error.localizedDescription)"
-            previewText = markdownText
+            let message = "Error loading file: \(error.localizedDescription)"
+            setDocumentText(message, modified: false)
         }
     }
 
@@ -224,14 +239,26 @@ struct ContentView: View {
         }
 
         provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-            guard let data = item as? Data,
-                  let url = URL(dataRepresentation: data, relativeTo: nil)
-            else {
+            let droppedURL: URL?
+            if let url = item as? URL {
+                droppedURL = url
+            } else if let data = item as? Data {
+                droppedURL = URL(dataRepresentation: data, relativeTo: nil)
+            } else {
+                droppedURL = nil
+            }
+
+            guard let url = droppedURL else {
                 return
             }
 
             DispatchQueue.main.async {
-                loadFile(url)
+                if self.isModified {
+                    guard self.confirmDiscardChanges() else {
+                        return
+                    }
+                }
+                self.loadFile(url)
             }
         }
 
