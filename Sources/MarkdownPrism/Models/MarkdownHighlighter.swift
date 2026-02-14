@@ -4,20 +4,26 @@ final class MarkdownHighlighter {
     private let baseFont = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
     private let baseColor = NSColor.labelColor
 
+    private let codeBlockPattern: NSRegularExpression?
+    private let inlineCodePattern: NSRegularExpression?
+
     private struct HighlightRule {
         let pattern: NSRegularExpression
         let attributes: [NSAttributedString.Key: Any]
     }
 
-    private let rules: [HighlightRule]
+    private let markdownRules: [HighlightRule]
 
     init() {
+        codeBlockPattern = try? NSRegularExpression(pattern: "^```[\\s\\S]*?^```", options: .anchorsMatchLines)
+        inlineCodePattern = try? NSRegularExpression(pattern: "`[^`\n]+`", options: [])
+
         var rules: [HighlightRule] = []
 
         let boldFont = NSFont.monospacedSystemFont(ofSize: 14, weight: .bold)
         let headerFont = NSFont.monospacedSystemFont(ofSize: 14, weight: .bold)
 
-        // Headers: ^#{1,6}\s.+$
+        // Headers
         if let regex = try? NSRegularExpression(pattern: "^#{1,6}\\s.+$", options: .anchorsMatchLines) {
             rules.append(HighlightRule(pattern: regex, attributes: [
                 .font: headerFont,
@@ -25,14 +31,14 @@ final class MarkdownHighlighter {
             ]))
         }
 
-        // Bold: **text** or __text__
+        // Bold
         if let regex = try? NSRegularExpression(pattern: "(\\*\\*.+?\\*\\*|__.+?__)", options: []) {
             rules.append(HighlightRule(pattern: regex, attributes: [
                 .font: boldFont
             ]))
         }
 
-        // Italic: *text* or _text_ (negative lookbehind/ahead for * to avoid matching **)
+        // Italic
         if let regex = try? NSRegularExpression(pattern: "(?<!\\*)\\*(?!\\*).+?(?<!\\*)\\*(?!\\*)|(?<!_)_(?!_).+?(?<!_)_(?!_)", options: []) {
             let italicDescriptor = NSFontDescriptor(fontAttributes: [
                 .family: "Menlo",
@@ -45,49 +51,35 @@ final class MarkdownHighlighter {
             ]))
         }
 
-        // Fenced code blocks: ```...``` (multiline)
-        if let regex = try? NSRegularExpression(pattern: "^```[\\s\\S]*?^```", options: .anchorsMatchLines) {
-            rules.append(HighlightRule(pattern: regex, attributes: [
-                .backgroundColor: NSColor.quaternaryLabelColor
-            ]))
-        }
-
-        // Inline code: `code`
-        if let regex = try? NSRegularExpression(pattern: "`[^`]+`", options: []) {
-            rules.append(HighlightRule(pattern: regex, attributes: [
-                .backgroundColor: NSColor.quaternaryLabelColor
-            ]))
-        }
-
-        // Links: [text](url)
+        // Links
         if let regex = try? NSRegularExpression(pattern: "\\[([^\\]]+)\\]\\(([^\\)]+)\\)", options: []) {
             rules.append(HighlightRule(pattern: regex, attributes: [
                 .foregroundColor: NSColor.systemBlue
             ]))
         }
 
-        // Blockquotes: ^> text
+        // Blockquotes
         if let regex = try? NSRegularExpression(pattern: "^>\\s.+$", options: .anchorsMatchLines) {
             rules.append(HighlightRule(pattern: regex, attributes: [
                 .foregroundColor: NSColor.secondaryLabelColor
             ]))
         }
 
-        // List markers: bullets or numbered
+        // List markers
         if let regex = try? NSRegularExpression(pattern: "^(\\s*[-*+]|\\s*\\d+\\.)\\s", options: .anchorsMatchLines) {
             rules.append(HighlightRule(pattern: regex, attributes: [
                 .foregroundColor: NSColor.systemOrange
             ]))
         }
 
-        // Horizontal rules: ---, ***, ___
+        // Horizontal rules
         if let regex = try? NSRegularExpression(pattern: "^(-{3,}|\\*{3,}|_{3,})$", options: .anchorsMatchLines) {
             rules.append(HighlightRule(pattern: regex, attributes: [
                 .foregroundColor: NSColor.secondaryLabelColor
             ]))
         }
 
-        self.rules = rules
+        self.markdownRules = rules
     }
 
     func highlight(_ textStorage: NSTextStorage) {
@@ -102,11 +94,37 @@ final class MarkdownHighlighter {
             .foregroundColor: baseColor
         ], range: fullRange)
 
-        // Apply each rule
-        for rule in rules {
+        // 1. Find code block ranges to exclude from markdown highlighting
+        var excludedRanges: [NSRange] = []
+
+        codeBlockPattern?.enumerateMatches(in: text, options: [], range: fullRange) { match, _, _ in
+            guard let range = match?.range else { return }
+            excludedRanges.append(range)
+            // Style the entire code block with gray background
+            textStorage.addAttributes([
+                .backgroundColor: NSColor.quaternaryLabelColor,
+                .foregroundColor: NSColor.secondaryLabelColor
+            ], range: range)
+        }
+
+        inlineCodePattern?.enumerateMatches(in: text, options: [], range: fullRange) { match, _, _ in
+            guard let range = match?.range else { return }
+            if !excludedRanges.contains(where: { NSIntersectionRange($0, range).length > 0 }) {
+                excludedRanges.append(range)
+                textStorage.addAttributes([
+                    .backgroundColor: NSColor.quaternaryLabelColor
+                ], range: range)
+            }
+        }
+
+        // 2. Apply markdown rules only outside code blocks
+        for rule in markdownRules {
             rule.pattern.enumerateMatches(in: text, options: [], range: fullRange) { match, _, _ in
                 guard let matchRange = match?.range else { return }
-                textStorage.addAttributes(rule.attributes, range: matchRange)
+                let isInsideCode = excludedRanges.contains { NSIntersectionRange($0, matchRange).length > 0 }
+                if !isInsideCode {
+                    textStorage.addAttributes(rule.attributes, range: matchRange)
+                }
             }
         }
 
