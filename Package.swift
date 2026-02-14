@@ -17,6 +17,11 @@ let package = Package(
             resources: [
                 .copy("Resources")
             ]
+        ),
+        .testTarget(
+            name: "MarkdownPrismTests",
+            dependencies: ["MarkdownPrism"],
+            path: "Tests/MarkdownPrismTests"
         )
     ]
 )
