@@ -56,6 +56,9 @@ struct ContentView: View {
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             handleDrop(providers)
         }
+        .onOpenURL { url in
+            loadFile(url)
+        }
         .onDisappear {
             fileWatcher?.stop()
             debounceWork?.cancel()
