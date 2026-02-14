@@ -20,7 +20,7 @@ struct EditorView: NSViewRepresentable {
         textView.isEditable = true
         textView.isSelectable = true
         textView.allowsUndo = true
-        textView.isRichText = false
+        textView.isRichText = true
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
@@ -41,6 +41,7 @@ struct EditorView: NSViewRepresentable {
         context.coordinator.textView = textView
 
         textView.string = text
+        context.coordinator.highlighter.highlight(textView.textStorage!)
 
         scrollView.documentView = textView
         return scrollView
@@ -51,6 +52,7 @@ struct EditorView: NSViewRepresentable {
         if textView.string != text {
             let selectedRanges = textView.selectedRanges
             textView.string = text
+            context.coordinator.highlighter.highlight(textView.textStorage!)
             textView.selectedRanges = selectedRanges
         }
     }
@@ -58,6 +60,7 @@ struct EditorView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: EditorView
         weak var textView: NSTextView?
+        let highlighter = MarkdownHighlighter()
 
         init(_ parent: EditorView) {
             self.parent = parent
@@ -66,6 +69,10 @@ struct EditorView: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             parent.text = textView.string
+
+            let selectedRanges = textView.selectedRanges
+            highlighter.highlight(textView.textStorage!)
+            textView.selectedRanges = selectedRanges
         }
     }
 }
