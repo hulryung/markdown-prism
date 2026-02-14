@@ -1,5 +1,7 @@
 # Markdown Prism
 
+> **Homepage:** [prism.huconn.xyz](https://prism.huconn.xyz)
+
 A native macOS Markdown viewer & editor with live preview, Quick Look support, and rich rendering.
 
 ![Markdown Prism editor with code, math, and diagrams](docs/assets/images/hero.png)
