@@ -1,0 +1,101 @@
+name: MarkdownPrism
+options:
+  bundleIdPrefix: com.markdownprism
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+
+targets:
+  MarkdownPrism:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/MarkdownPrism
+        excludes:
+          - "Info.plist"
+          - "Resources/**"
+      - path: Sources/MarkdownPrism/Resources
+        type: folder
+        buildPhase: resources
+    info:
+      path: Sources/MarkdownPrism/Info.plist
+      properties:
+        CFBundleName: Markdown Prism
+        CFBundleDisplayName: Markdown Prism
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSMinimumSystemVersion: "14.0"
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Markdown Document
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Default
+            LSItemContentTypes:
+              - net.daringfireball.markdown
+              - public.plain-text
+            CFBundleTypeExtensions:
+              - md
+              - markdown
+              - mdown
+              - mkd
+        UTImportedTypeDeclarations:
+          - UTTypeConformsTo:
+              - public.plain-text
+            UTTypeDescription: Markdown Document
+            UTTypeIdentifier: net.daringfireball.markdown
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - md
+                - markdown
+                - mdown
+                - mkd
+    entitlements:
+      path: MarkdownPrism.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.markdownprism.app
+    dependencies:
+      - target: MarkdownPrismQuickLook
+        embed: true
+
+  MarkdownPrismQuickLook:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: Sources/QuickLookExtension
+        excludes:
+          - "Info.plist"
+      - path: Sources/MarkdownPrism/Resources
+        type: folder
+        buildPhase: resources
+    info:
+      path: Sources/QuickLookExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Markdown Prism Quick Look
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.quicklook.preview
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PreviewViewController
+          NSExtensionAttributes:
+            QLSupportedContentTypes:
+              - net.daringfireball.markdown
+              - public.plain-text
+            QLSupportsSearchableItems: false
+    entitlements:
+      path: MarkdownPrismQuickLook.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.markdownprism.app.quicklook
+      SKIP_INSTALL: true
+    dependencies:
+      - sdk: Quartz.framework
+      - sdk: WebKit.framework

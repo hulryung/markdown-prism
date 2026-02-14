@@ -14,7 +14,12 @@ struct PreviewView: NSViewRepresentable {
         webView.navigationDelegate = context.coordinator
         context.coordinator.webView = webView
 
-        if let templateURL = Bundle.module.url(
+        #if SWIFT_PACKAGE
+        let resourceBundle = Bundle.module
+        #else
+        let resourceBundle = Bundle.main
+        #endif
+        if let templateURL = resourceBundle.url(
             forResource: "preview",
             withExtension: "html",
             subdirectory: "Resources"
