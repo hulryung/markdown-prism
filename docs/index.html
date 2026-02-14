@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Prism - macOS Native Markdown Viewer & Editor</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <div class="logo">
+                <i class="fas fa-prism"></i> <span>Markdown Prism</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#features">기능</a></li>
+                <li><a href="#preview">미리보기</a></li>
+                <li><a href="#download" class="btn-primary">다운로드</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="container hero-grid">
+                <div class="hero-content">
+                    <span class="badge">macOS 전용 네이티브 앱</span>
+                    <h1>가장 우아한 방식의<br>마크다운 경험</h1>
+                    <p>Markdown Prism은 개발자와 작가를 위한 빠르고 가벼운 macOS 전용 마크다운 뷰어이자 에디터입니다. GFM, LaTeX 수식, Mermaid 다이어그램을 완벽하게 지원합니다.</p>
+                    <div class="hero-actions">
+                        <a href="#download" class="btn-primary btn-large"><i class="fab fa-apple"></i> macOS용 다운로드</a>
+                        <a href="https://github.com/dkkang/markdown-viewer" class="btn-secondary btn-large"><i class="fab fa-github"></i> GitHub에서 보기</a>
+                    </div>
+                </div>
+                <div class="hero-image">
+                    <div class="app-mockup">
+                        <div class="window-controls">
+                            <span class="close"></span>
+                            <span class="minimize"></span>
+                            <span class="maximize"></span>
+                        </div>
+                        <img src="assets/images/hero.png" alt="Markdown Prism Screenshot" class="app-screenshot-img">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="features" class="features">
+            <div class="container">
+                <div class="section-header">
+                    <h2>생산성을 높이는 강력한 기능</h2>
+                    <p>Markdown Prism은 당신의 워크플로우를 방해하지 않으면서 필요한 모든 도구를 제공합니다.</p>
+                </div>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="icon"><i class="fas fa-bolt"></i></div>
+                        <h3>실시간 미리보기</h3>
+                        <p>입력과 동시에 오른쪽 프리뷰 화면에서 결과물을 바로 확인하세요. 400ms 디바운싱으로 쾌적한 편집 경험을 제공합니다.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon"><i class="fas fa-square-root-variable"></i></div>
+                        <h3>고급 렌더링</h3>
+                        <p>KaTeX를 통한 고품질 수식 렌더링과 Mermaid를 이용한 복잡한 다이어그램 및 순서도를 지원합니다.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon"><i class="fas fa-code"></i></div>
+                        <h3>구문 하이라이팅</h3>
+                        <p>180개 이상의 언어를 지원하는 highlight.js가 내장되어 있어, 어떤 코드 블록도 아름답게 표시합니다.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon"><i class="fas fa-eye"></i></div>
+                        <h3>QuickLook 지원</h3>
+                        <p>앱을 열지 않고도 Finder에서 스페이스바를 눌러 마크다운 파일의 내용을 즉시 미리볼 수 있습니다.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon"><i class="fas fa-wifi-slash"></i></div>
+                        <h3>오프라인 지원</h3>
+                        <p>모든 필수 라이브러리가 앱 내에 번들링되어 있어, 인터넷 연결 없이도 모든 기능을 완벽하게 사용할 수 있습니다.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon"><i class="fas fa-file-export"></i></div>
+                        <h3>파일 자동 감시</h3>
+                        <p>외부 에디터에서 파일을 수정하면 Markdown Prism이 이를 감지하고 실시간으로 내용을 업데이트합니다.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="editor-showcase">
+            <div class="container">
+                <div class="showcase-content">
+                    <div class="image-side">
+                        <div class="app-mockup">
+                            <div class="window-controls">
+                                <span class="close"></span>
+                                <span class="minimize"></span>
+                                <span class="maximize"></span>
+                            </div>
+                            <img src="assets/images/editor.png" alt="Native Editor" class="app-screenshot-img">
+                        </div>
+                    </div>
+                    <div class="text-side">
+                        <h2>강력한 네이티브 에디터</h2>
+                        <p>단순한 뷰어를 넘어선 강력한 편집 기능을 제공합니다. macOS의 네이티브 텍스트 엔진을 활용하여 부드럽고 정확한 타이핑 경험을 제공하며, 마크다운 구문 강조를 통해 가독성을 높였습니다.</p>
+                        <ul class="check-list">
+                            <li><i class="fas fa-check"></i> 부드러운 스크롤 및 타이핑</li>
+                            <li><i class="fas fa-check"></i> 자동 저장 및 버전 관리</li>
+                            <li><i class="fas fa-check"></i> 다크 모드 및 라이트 모드 지원</li>
+                            <li><i class="fas fa-check"></i> 표준 단축키 (Cmd+S, Cmd+O, Cmd+N)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="preview" class="demo">
+            <div class="container">
+                <div class="demo-content">
+                    <div class="text-side">
+                        <h2>수식부터 다이어그램까지</h2>
+                        <p>복잡한 논문 작업이나 기술 문서를 작성하시나요? Markdown Prism은 가장 까다로운 요구사항도 충족합니다.</p>
+                        <ul class="check-list">
+                            <li><i class="fas fa-check"></i> GitHub Flavored Markdown 완벽 지원</li>
+                            <li><i class="fas fa-check"></i> 인라인 및 블록 수식 ($E=mc^2$)</li>
+                            <li><i class="fas fa-check"></i> Flowchart, Gantt, Sequence 다이어그램</li>
+                            <li><i class="fas fa-check"></i> 다크 모드 완벽 대응</li>
+                        </ul>
+                    </div>
+                    <div class="image-side">
+                        <div class="demo-image-container">
+                            <img src="assets/images/demo.png" alt="Markdown Prism Demo" class="demo-screenshot-img">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="download" class="cta">
+            <div class="container">
+                <div class="cta-box">
+                    <h2>지금 바로 시작하세요</h2>
+                    <p>Markdown Prism은 완전히 무료이며 오픈 소스입니다. 최고의 마크다운 뷰어를 직접 경험해보세요.</p>
+                    <div class="cta-actions">
+                        <a href="https://github.com/dkkang/markdown-viewer/releases/download/v0.1.0/MarkdownPrism-0.1.0.dmg" class="btn-primary btn-large">
+                            <i class="fab fa-apple"></i> v0.1.0 다운로드 (.dmg)
+                        </a>
+                    </div>
+                    <p class="meta">지원 사양: macOS 14.0 (Sonoma) 이상</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container footer-grid">
+            <div class="footer-info">
+                <div class="logo">
+                    <i class="fas fa-prism"></i> <span>Markdown Prism</span>
+                </div>
+                <p>macOS 사용자를 위한 최고의 마크다운 도구.</p>
+            </div>
+            <div class="footer-links">
+                <h4>프로젝트</h4>
+                <ul>
+                    <li><a href="https://github.com/dkkang/markdown-viewer">GitHub Repository</a></li>
+                    <li><a href="https://github.com/dkkang/markdown-viewer/issues">이슈 제보</a></li>
+                    <li><a href="https://github.com/dkkang/markdown-viewer/blob/main/LICENSE">라이선스</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom container">
+            <p>&copy; 2026 Markdown Prism. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>
