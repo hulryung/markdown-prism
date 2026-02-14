@@ -14,16 +14,21 @@ struct PreviewView: NSViewRepresentable {
         webView.navigationDelegate = context.coordinator
         context.coordinator.webView = webView
 
-        #if SWIFT_PACKAGE
-        let resourceBundle = Bundle.module
-        #else
-        let resourceBundle = Bundle.main
-        #endif
-        if let templateURL = resourceBundle.url(
-            forResource: "preview",
-            withExtension: "html",
-            subdirectory: "Resources"
-        ) {
+        let templateURL: URL? = {
+            #if SWIFT_PACKAGE
+            return Bundle.module.url(
+                forResource: "preview",
+                withExtension: "html",
+                subdirectory: "Resources"
+            )
+            #else
+            return Bundle.main.resourceURL?
+                .appendingPathComponent("Resources")
+                .appendingPathComponent("preview.html")
+            #endif
+        }()
+
+        if let templateURL, FileManager.default.fileExists(atPath: templateURL.path) {
             webView.loadFileURL(templateURL, allowingReadAccessTo: templateURL.deletingLastPathComponent())
         } else {
             webView.loadHTMLString("<html><body><pre>Failed to load preview template.</pre></body></html>", baseURL: nil)

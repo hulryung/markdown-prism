@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
+    @EnvironmentObject private var openFileState: OpenFileState
     @State private var markdownText = ContentView.welcomeMarkdown
     @State private var previewText = ContentView.welcomeMarkdown
     @State private var fileURL: URL?
@@ -58,6 +59,18 @@ struct ContentView: View {
         }
         .onOpenURL { url in
             loadFile(url)
+        }
+        .onChange(of: openFileState.pendingURL) {
+            if let url = openFileState.pendingURL {
+                openFileState.pendingURL = nil
+                loadFile(url)
+            }
+        }
+        .onAppear {
+            if let url = openFileState.pendingURL {
+                openFileState.pendingURL = nil
+                loadFile(url)
+            }
         }
         .onDisappear {
             fileWatcher?.stop()

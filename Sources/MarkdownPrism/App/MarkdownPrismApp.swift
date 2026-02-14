@@ -1,10 +1,26 @@
 import SwiftUI
 
+class OpenFileState: ObservableObject {
+    @Published var pendingURL: URL?
+}
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+    let openFileState = OpenFileState()
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard let url = urls.first else { return }
+        openFileState.pendingURL = url
+    }
+}
+
 @main
 struct MarkdownPrismApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(appDelegate.openFileState)
         }
         .defaultSize(width: 1200, height: 800)
         .commands {
