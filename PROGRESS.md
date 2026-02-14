@@ -1,10 +1,41 @@
-# markdown-prism Phase 1 Progress Report
+# markdown-prism Progress Report
 
-> Generated: 2026-02-14
-> Status: Phase 1 Complete (빌드 통과, 기능 검증 필요)
-> Commit: `b0c0ddc` - "App: add Phase 1 markdown viewer with WKWebView rendering"
+> Last Updated: 2026-02-14
+> Current Phase: Phase 2 Complete
+> Next: Phase 3 (Quick Look extension)
 
 ---
+
+## Phase 2 Summary (Latest)
+
+> Commit: `764b28d` - "App: add Phase 2 editor with split-pane preview and file operations"
+
+### 새로 추가된 파일
+- `Sources/MarkdownPrism/Views/EditorView.swift` (71줄) - NSTextView 래퍼, 모노스페이스 폰트, undo 지원
+
+### 수정된 파일
+- `ContentView.swift` (232줄 추가) - HSplitView, 디바운스, Save/SaveAs/New, modified indicator
+- `MarkdownPrismApp.swift` (36줄 추가) - File 메뉴 커맨드 (FocusedValue 브릿지)
+
+### 주요 기능
+- HSplitView 에디터 + 프리뷰 split pane (드래그 가능 디바이더)
+- 400ms 디바운스 실시간 프리뷰
+- 에디터 토글 (Cmd+Shift+E)
+- Save (Cmd+S), Save As (Cmd+Shift+S), New (Cmd+N)
+- 수정 표시 (제목표시줄 "-- Edited")
+- 미저장 변경 확인 다이얼로그
+
+### Phase 2 남은 이슈
+- [ ] 에디터 마크다운 구문 하이라이팅 (현재 plain monospace)
+- [ ] 스크롤 동기화 (에디터 ↔ 프리뷰)
+- [ ] 에디터 줄번호 표시
+
+---
+
+## Phase 1 Summary
+
+> Commit: `f75e661` - "Preview: add highlight.js and fix Mermaid dark mode"
+> Base Commit: `b0c0ddc` - "App: add Phase 1 markdown viewer with WKWebView rendering"
 
 ## 1. 프로젝트 개요
 
@@ -172,25 +203,38 @@ markdown-it의 strikethrough는 기본 비활성. `{ breaks: false }` 설정은 
 
 ---
 
-## 6. Phase 2 준비 사항
+## 6. Phase 1→2 이행 결과
 
-Phase 2 (에디터 + 실시간 프리뷰)를 시작하기 전에 해결해야 할 항목:
+### 해결됨
+1. [x] highlight.js 추가 및 코드 하이라이팅 (f75e661)
+2. [x] FileWatcher 연결 (이미 구현되어 있었음)
+3. [x] Refresh 버튼 + Cmd+O/Cmd+R (이미 구현되어 있었음)
+4. [x] Mermaid 다크 모드 테마 전환 (f75e661)
+5. [x] HSplitView 에디터 + 프리뷰 (764b28d)
+6. [x] 디바운스된 실시간 프리뷰 400ms (764b28d)
+7. [x] Save/SaveAs/New 파일 작업 (764b28d)
 
-### 필수 (Must Fix)
-1. [ ] highlight.js 추가 및 코드 하이라이팅 작동 확인
-2. [ ] FileWatcher를 ContentView에 연결
-3. [ ] Refresh 버튼 + Cmd+O/Cmd+R 키보드 단축키
+### 미해결 (Phase 3+ 이후)
+- [ ] strikethrough 동작 확인
+- [ ] `Bundle.module.url()` 실패 시 fallback UI
+- [ ] 에디터 마크다운 구문 하이라이팅
+- [ ] 스크롤 동기화 (에디터 ↔ 프리뷰)
 
-### 권장 (Should Fix)
-4. [ ] Mermaid 다크 모드 테마 전환
-5. [ ] strikethrough 동작 확인
-6. [ ] `Bundle.module.url()` 실패 시 fallback UI
+## Phase 3 계획: Quick Look Extension
 
-### Phase 2 범위
-7. [ ] NavigationSplitView로 전환 (에디터 | 프리뷰 split)
-8. [ ] NSTextView 기반 마크다운 에디터 (구문 하이라이팅)
-9. [ ] 디바운스된 실시간 프리뷰 업데이트 (300-500ms)
-10. [ ] 스크롤 동기화 (에디터 ↔ 프리뷰)
+- .appex 번들 형태 (macOS 15+ 필수)
+- QLPreviewingController 프로토콜 구현
+- preview.html + css/style.css 렌더러 재사용
+- UTType 선언: public.markdown, net.daringfireball.markdown
+
+## Phase 4 계획: Polish
+
+- 테마 선택 (GitHub Light/Dark, Dracula 등)
+- JS 라이브러리 로컬 번들링 (오프라인 지원)
+- 환경설정 패널 (폰트 크기, 테마, 에디터 설정)
+- 앱 아이콘 및 About 다이얼로그
+- Info.plist + UTType 파일 연결
+- 성능 최적화 (대용량 파일)
 
 ---
 
