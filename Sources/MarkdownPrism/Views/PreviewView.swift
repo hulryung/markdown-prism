@@ -20,6 +20,8 @@ struct PreviewView: NSViewRepresentable {
             subdirectory: "Resources"
         ) {
             webView.loadFileURL(templateURL, allowingReadAccessTo: templateURL.deletingLastPathComponent())
+        } else {
+            webView.loadHTMLString("<html><body><pre>Failed to load preview template.</pre></body></html>", baseURL: nil)
         }
 
         return webView
