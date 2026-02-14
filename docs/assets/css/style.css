@@ -421,10 +421,10 @@ nav {
     border: 1px solid var(--border);
     margin-top: 1rem;
     font-family: 'SF Mono', Menlo, monospace;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     color: var(--primary);
-    overflow-x: auto;
-    white-space: nowrap;
+    word-break: break-all;
+    white-space: normal;
 }
 
 .install-note {
