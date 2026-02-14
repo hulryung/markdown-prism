@@ -4,101 +4,111 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css" media="(prefers-color-scheme: light)">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
-  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/markdown-it-task-lists@2.1.1/index.min.js"></script>
-  <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.12.0/+esm';
-
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
-    mermaid.initialize({
-      startOnLoad: false,
-      securityLevel: 'strict',
-      theme: prefersDark.matches ? 'dark' : 'default'
-    });
-
-    prefersDark.addEventListener('change', (e) => {
+  <!-- KaTeX CSS (was: https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css) -->
+  <link rel="stylesheet" href="vendor/katex.min.css">
+  <!-- highlight.js themes (were: https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css, github-dark.min.css) -->
+  <link rel="stylesheet" href="vendor/github.min.css" media="(prefers-color-scheme: light)">
+  <link rel="stylesheet" href="vendor/github-dark.min.css" media="(prefers-color-scheme: dark)">
+  <!-- highlight.js (was: https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js) -->
+  <script src="vendor/highlight.min.js"></script>
+  <!-- KaTeX (was: https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js) -->
+  <script defer src="vendor/katex.min.js"></script>
+  <!-- KaTeX auto-render (was: https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js) -->
+  <script defer src="vendor/auto-render.min.js"></script>
+  <!-- markdown-it (was: https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js) -->
+  <script src="vendor/markdown-it.min.js"></script>
+  <!-- markdown-it-task-lists (was: https://cdn.jsdelivr.net/npm/markdown-it-task-lists@2.1.1/index.min.js) -->
+  <script src="vendor/markdown-it-task-lists.min.js"></script>
+  <!-- Mermaid UMD (was: https://cdn.jsdelivr.net/npm/mermaid@11.12.0/+esm via ES module import) -->
+  <script src="vendor/mermaid.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
       mermaid.initialize({
         startOnLoad: false,
         securityLevel: 'strict',
-        theme: e.matches ? 'dark' : 'default'
+        theme: prefersDark.matches ? 'dark' : 'default'
       });
-    });
 
-    const md = window.markdownit({
-      html: false,
-      linkify: true,
-      typographer: true,
-      breaks: false,
-      highlight: function (str, lang) {
-        if (lang && window.hljs && hljs.getLanguage(lang)) {
-          try { return hljs.highlight(str, { language: lang }).value; } catch (_) {}
-        }
-        if (window.hljs) {
-          try { return hljs.highlightAuto(str).value; } catch (_) {}
-        }
-        return '';
-      }
-    });
-
-    if (window.markdownitTaskLists) {
-      md.use(window.markdownitTaskLists, { enabled: false, label: true, labelAfter: true });
-    }
-
-    async function renderMermaidBlocks() {
-      const blocks = Array.from(document.querySelectorAll('pre code.language-mermaid'));
-      for (const block of blocks) {
-        const src = block.textContent || '';
-        const parentPre = block.closest('pre');
-        if (!parentPre) {
-          continue;
-        }
-
-        const holder = document.createElement('div');
-        holder.className = 'mermaid';
-        holder.textContent = src;
-        parentPre.replaceWith(holder);
-      }
-
-      if (blocks.length > 0) {
-        try {
-          await mermaid.run({ querySelector: '.mermaid' });
-        } catch (err) {
-          console.error('Mermaid render failed:', err);
-        }
-      }
-    }
-
-    function renderMath() {
-      if (!window.renderMathInElement) {
-        return;
-      }
-      window.renderMathInElement(document.getElementById('content'), {
-        delimiters: [
-          { left: '$$', right: '$$', display: true },
-          { left: '$', right: '$', display: false },
-          { left: '\\(', right: '\\)', display: false },
-          { left: '\\[', right: '\\]', display: true }
-        ],
-        throwOnError: false
+      prefersDark.addEventListener('change', function (e) {
+        mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: 'strict',
+          theme: e.matches ? 'dark' : 'default'
+        });
       });
-    }
 
-    async function renderMarkdown(markdown) {
-      const html = md.render(markdown || '');
-      const content = document.getElementById('content');
-      content.innerHTML = html;
-      renderMath();
-      await renderMermaidBlocks();
-    }
+      var md = window.markdownit({
+        html: false,
+        linkify: true,
+        typographer: true,
+        breaks: false,
+        highlight: function (str, lang) {
+          if (lang && window.hljs && hljs.getLanguage(lang)) {
+            try { return hljs.highlight(str, { language: lang }).value; } catch (_) {}
+          }
+          if (window.hljs) {
+            try { return hljs.highlightAuto(str).value; } catch (_) {}
+          }
+          return '';
+        }
+      });
 
-    window.renderMarkdown = renderMarkdown;
-    window.addEventListener('DOMContentLoaded', () => renderMarkdown(''));
+      if (window.markdownitTaskLists) {
+        md.use(window.markdownitTaskLists, { enabled: false, label: true, labelAfter: true });
+      }
+
+      function renderMermaidBlocks() {
+        var blocks = Array.from(document.querySelectorAll('pre code.language-mermaid'));
+        for (var i = 0; i < blocks.length; i++) {
+          var block = blocks[i];
+          var src = block.textContent || '';
+          var parentPre = block.closest('pre');
+          if (!parentPre) {
+            continue;
+          }
+
+          var holder = document.createElement('div');
+          holder.className = 'mermaid';
+          holder.textContent = src;
+          parentPre.replaceWith(holder);
+        }
+
+        if (blocks.length > 0) {
+          try {
+            mermaid.run({ querySelector: '.mermaid' });
+          } catch (err) {
+            console.error('Mermaid render failed:', err);
+          }
+        }
+      }
+
+      function renderMath() {
+        if (!window.renderMathInElement) {
+          return;
+        }
+        window.renderMathInElement(document.getElementById('content'), {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false },
+            { left: '\\(', right: '\\)', display: false },
+            { left: '\\[', right: '\\]', display: true }
+          ],
+          throwOnError: false
+        });
+      }
+
+      function renderMarkdown(markdown) {
+        var html = md.render(markdown || '');
+        var content = document.getElementById('content');
+        content.innerHTML = html;
+        renderMath();
+        renderMermaidBlocks();
+      }
+
+      window.renderMarkdown = renderMarkdown;
+      renderMarkdown('');
+    });
   </script>
 </head>
 <body>
