@@ -168,6 +168,30 @@ nav {
     color: var(--primary);
 }
 
+.lang-switch {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-left: 1rem;
+}
+
+.lang-switch a {
+    text-decoration: none;
+    color: var(--text-muted) !important;
+}
+
+.lang-switch a.active {
+    color: var(--primary) !important;
+}
+
+.lang-switch span {
+    font-weight: 300;
+    color: var(--border);
+}
+
 /* Hero Section */
 .hero {
     padding: 8rem 0 4rem;

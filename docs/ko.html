@@ -1,26 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Markdown Prism - macOS Native Markdown Viewer & Editor</title>
     <link rel="canonical" href="https://prism.huconn.xyz">
     
-    <!-- Language Detection -->
-    <script>
-        (function() {
-            const userLang = navigator.language || navigator.userLanguage;
-            const hasChosenLang = localStorage.getItem('preferred-lang');
-            if (!hasChosenLang && userLang.startsWith('ko')) {
-                window.location.href = 'ko.html';
-            }
-        })();
-    </script>
-
     <!-- Meta Tags -->
-    <meta name="description" content="The most elegant macOS-native Markdown viewer and editor. Full support for GFM, LaTeX, and Mermaid.">
+    <meta name="description" content="가장 우아한 방식의 macOS 전용 마크다운 뷰어이자 에디터. GFM, LaTeX, Mermaid 완벽 지원.">
     <meta property="og:title" content="Markdown Prism">
-    <meta property="og:description" content="The most elegant macOS-native Markdown viewer and editor.">
+    <meta property="og:description" content="가장 우아한 방식의 macOS 전용 마크다운 뷰어이자 에디터.">
     <meta property="og:url" content="https://prism.huconn.xyz">
     <meta property="og:type" content="website">
     <meta property="og:image" content="https://prism.huconn.xyz/assets/images/hero.png">
@@ -38,13 +27,14 @@
                 <i class="fas fa-prism"></i> <span>Markdown Prism</span>
             </div>
             <ul class="nav-links">
-                <li><a href="#features">Features</a></li>
-                <li><a href="#installation">Install</a></li>
-                <li><a href="#download" class="btn-primary">Download</a></li>
+                <li><a href="#features">기능</a></li>
+                <li><a href="#installation">설치방법</a></li>
+                <li><a href="#preview">미리보기</a></li>
+                <li><a href="#download" class="btn-primary">다운로드</a></li>
                 <li class="lang-switch">
-                    <a href="ko.html" onclick="localStorage.setItem('preferred-lang', 'ko')">KO</a>
+                    <a href="ko.html" class="active">KO</a>
                     <span>|</span>
-                    <a href="index.html" class="active">EN</a>
+                    <a href="index.html" onclick="localStorage.setItem('preferred-lang', 'en')">EN</a>
                 </li>
             </ul>
         </nav>
@@ -54,12 +44,12 @@
         <section class="hero">
             <div class="container hero-grid">
                 <div class="hero-content">
-                    <span class="badge">Native macOS App</span>
-                    <h1>The Most Elegant Way to<br>Experience Markdown</h1>
-                    <p>Markdown Prism is a fast, lightweight macOS-native Markdown viewer and editor. Built for developers and writers, with full support for GFM, LaTeX, and Mermaid.</p>
+                    <span class="badge">macOS 전용 네이티브 앱</span>
+                    <h1>가장 우아한 방식의<br>마크다운 경험</h1>
+                    <p>Markdown Prism은 개발자와 작가를 위한 빠르고 가벼운 macOS 전용 마크다운 뷰어이자 에디터입니다. GFM, LaTeX 수식, Mermaid 다이어그램을 완벽하게 지원합니다.</p>
                     <div class="hero-actions">
-                        <a href="#download" class="btn-primary btn-large"><i class="fab fa-apple"></i> Download for macOS</a>
-                        <a href="https://github.com/hulryung/markdown-prism" class="btn-secondary btn-large"><i class="fab fa-github"></i> View on GitHub</a>
+                        <a href="#download" class="btn-primary btn-large"><i class="fab fa-apple"></i> macOS용 다운로드</a>
+                        <a href="https://github.com/hulryung/markdown-prism" class="btn-secondary btn-large"><i class="fab fa-github"></i> GitHub에서 보기</a>
                     </div>
                 </div>
                 <div class="hero-image">
@@ -78,39 +68,39 @@
         <section id="features" class="features">
             <div class="container">
                 <div class="section-header">
-                    <h2>Powerful Features for Productivity</h2>
-                    <p>Markdown Prism provides all the tools you need without getting in your way.</p>
+                    <h2>생산성을 높이는 강력한 기능</h2>
+                    <p>Markdown Prism은 당신의 워크플로우를 방해하지 않으면서 필요한 모든 도구를 제공합니다.</p>
                 </div>
                 <div class="features-grid">
                     <div class="feature-card">
                         <div class="icon"><i class="fas fa-bolt"></i></div>
-                        <h3>Live Preview</h3>
-                        <p>See your changes instantly with a side-by-side preview. 400ms debouncing ensures a smooth editing experience.</p>
+                        <h3>실시간 미리보기</h3>
+                        <p>입력과 동시에 오른쪽 프리뷰 화면에서 결과물을 바로 확인하세요. 400ms 디바운싱으로 쾌적한 편집 경험을 제공합니다.</p>
                     </div>
                     <div class="feature-card">
                         <div class="icon"><i class="fas fa-square-root-variable"></i></div>
-                        <h3>Rich Rendering</h3>
-                        <p>High-quality math rendering via KaTeX and complex diagrams/flowcharts with Mermaid.js.</p>
+                        <h3>고급 렌더링</h3>
+                        <p>KaTeX를 통한 고품질 수식 렌더링과 Mermaid를 이용한 복잡한 다이어그램 및 순서도를 지원합니다.</p>
                     </div>
                     <div class="feature-card">
                         <div class="icon"><i class="fas fa-code"></i></div>
-                        <h3>Syntax Highlighting</h3>
-                        <p>Built-in highlight.js supporting 180+ languages to make your code blocks look beautiful.</p>
+                        <h3>구문 하이라이팅</h3>
+                        <p>180개 이상의 언어를 지원하는 highlight.js가 내장되어 있어, 어떤 코드 블록도 아름답게 표시합니다.</p>
                     </div>
                     <div class="feature-card">
                         <div class="icon"><i class="fas fa-eye"></i></div>
-                        <h3>QuickLook Support</h3>
-                        <p>Preview Markdown files instantly in Finder by pressing the spacebar, without opening the app.</p>
+                        <h3>QuickLook 지원</h3>
+                        <p>앱을 열지 않고도 Finder에서 스페이스바를 눌러 마크다운 파일의 내용을 즉시 미리볼 수 있습니다.</p>
                     </div>
                     <div class="feature-card">
                         <div class="icon"><i class="fas fa-wifi-slash"></i></div>
-                        <h3>Offline Support</h3>
-                        <p>All essential libraries are bundled within the app. Works perfectly without an internet connection.</p>
+                        <h3>오프라인 지원</h3>
+                        <p>모든 필수 라이브러리가 앱 내에 번들링되어 있어, 인터넷 연결 없이도 모든 기능을 완벽하게 사용할 수 있습니다.</p>
                     </div>
                     <div class="feature-card">
                         <div class="icon"><i class="fas fa-file-export"></i></div>
-                        <h3>File Watching</h3>
-                        <p>Automatically detects external changes and refreshes the content in real-time.</p>
+                        <h3>파일 자동 감시</h3>
+                        <p>외부 에디터에서 파일을 수정하면 Markdown Prism이 이를 감지하고 실시간으로 내용을 업데이트합니다.</p>
                     </div>
                 </div>
             </div>
@@ -130,13 +120,13 @@
                         </div>
                     </div>
                     <div class="text-side">
-                        <h2>Powerful Native Editor</h2>
-                        <p>Beyond a simple viewer. Leverages the native macOS text engine for smooth typing, featuring Markdown syntax highlighting for better readability.</p>
+                        <h2>강력한 네이티브 에디터</h2>
+                        <p>단순한 뷰어를 넘어선 강력한 편집 기능을 제공합니다. macOS의 네이티브 텍스트 엔진을 활용하여 부드럽고 정확한 타이핑 경험을 제공하며, 마크다운 구문 강조를 통해 가독성을 높였습니다.</p>
                         <ul class="check-list">
-                            <li><i class="fas fa-check"></i> Smooth scrolling & typing</li>
-                            <li><i class="fas fa-check"></i> Auto-save & Versioning</li>
-                            <li><i class="fas fa-check"></i> Dark/Light mode support</li>
-                            <li><i class="fas fa-check"></i> Standard shortcuts (Cmd+S, Cmd+O, Cmd+N)</li>
+                            <li><i class="fas fa-check"></i> 부드러운 스크롤 및 타이핑</li>
+                            <li><i class="fas fa-check"></i> 자동 저장 및 버전 관리</li>
+                            <li><i class="fas fa-check"></i> 다크 모드 및 라이트 모드 지원</li>
+                            <li><i class="fas fa-check"></i> 표준 단축키 (Cmd+S, Cmd+O, Cmd+N)</li>
                         </ul>
                     </div>
                 </div>
@@ -147,13 +137,13 @@
             <div class="container">
                 <div class="demo-content">
                     <div class="text-side">
-                        <h2>From Math to Diagrams</h2>
-                        <p>Working on academic papers or technical docs? Markdown Prism meets the most demanding requirements.</p>
+                        <h2>수식부터 다이어그램까지</h2>
+                        <p>복잡한 논문 작업이나 기술 문서를 작성하시나요? Markdown Prism은 가장 까다로운 요구사항도 충족합니다.</p>
                         <ul class="check-list">
-                            <li><i class="fas fa-check"></i> Full GFM support</li>
-                            <li><i class="fas fa-check"></i> Inline & Block math ($E=mc^2$)</li>
-                            <li><i class="fas fa-check"></i> Flowchart, Gantt, Sequence diagrams</li>
-                            <li><i class="fas fa-check"></i> Perfect Dark Mode support</li>
+                            <li><i class="fas fa-check"></i> GitHub Flavored Markdown 완벽 지원</li>
+                            <li><i class="fas fa-check"></i> 인라인 및 블록 수식 ($E=mc^2$)</li>
+                            <li><i class="fas fa-check"></i> Flowchart, Gantt, Sequence 다이어그램</li>
+                            <li><i class="fas fa-check"></i> 다크 모드 완벽 대응</li>
                         </ul>
                     </div>
                     <div class="image-side">
@@ -168,31 +158,31 @@
         <section id="installation" class="installation">
             <div class="container">
                 <div class="section-header">
-                    <h2>Installation</h2>
-                    <p>Get Markdown Prism up and running in just a few steps.</p>
+                    <h2>설치 방법</h2>
+                    <p>몇 단계만으로 Markdown Prism을 설치하고 바로 사용할 수 있습니다.</p>
                 </div>
                 <div class="install-steps">
                     <div class="step">
                         <div class="step-number"><i class="fas fa-terminal"></i></div>
-                        <h3>Homebrew</h3>
-                        <p>Install easily via terminal with a single command.</p>
+                        <h3>Homebrew 설치</h3>
+                        <p>터미널에서 아래 명령어를 입력하여 간편하게 설치할 수 있습니다.</p>
                         <div class="code-snippet-box">
                             <code>brew install hulryung/tap/markdown-prism</code>
                         </div>
                     </div>
                     <div class="step">
                         <div class="step-number">1</div>
-                        <h3>Download DMG</h3>
-                        <p>Or download the DMG file directly from our releases page.</p>
+                        <h3>DMG 다운로드</h3>
+                        <p>직접 설치를 원하시면 아래 다운로드 버튼을 클릭하여 DMG 파일을 받으세요.</p>
                     </div>
                     <div class="step">
                         <div class="step-number">2</div>
-                        <h3>Move to Applications</h3>
-                        <p>Open the DMG and drag the Markdown Prism icon to your Applications folder.</p>
+                        <h3>응용 프로그램으로 이동</h3>
+                        <p>DMG 파일을 열고 Markdown Prism 아이콘을 Applications 폴더로 드래그하세요.</p>
                     </div>
                 </div>
                 <div class="install-note">
-                    <p><i class="fas fa-info-circle"></i> <strong>Note:</strong> If you see an "Unidentified Developer" message, please allow it in <code>System Settings > Privacy & Security</code>.</p>
+                    <p><i class="fas fa-info-circle"></i> <strong>참고:</strong> 확인되지 않은 개발자 메시지가 표시될 경우, <code>System Settings > Privacy & Security</code>에서 실행을 허용해 주세요.</p>
                 </div>
             </div>
         </section>
@@ -201,38 +191,38 @@
             <div class="container">
                 <div class="cta-box">
                     <span class="version-badge">Latest Version: v0.1.0</span>
-                    <h2>Get Started Now</h2>
-                    <p>Markdown Prism is completely free and open source. Experience the best Markdown viewer for yourself.</p>
+                    <h2>지금 바로 시작하세요</h2>
+                    <p>Markdown Prism은 완전히 무료이며 오픈 소스입니다. 최고의 마크다운 뷰어를 직접 경험해보세요.</p>
                     
                     <div class="download-cards">
                         <div class="download-card main">
                             <i class="fab fa-apple"></i>
                             <div class="card-info">
-                                <h3>Download for macOS</h3>
-                                <p>Intel & Apple Silicon</p>
+                                <h3>macOS용 다운로드</h3>
+                                <p>Intel & Apple Silicon 지원</p>
                             </div>
                             <a href="https://github.com/hulryung/markdown-prism/releases/download/v0.1.0/MarkdownPrism-0.1.0.dmg" class="btn-primary">
-                                .dmg Download
+                                .dmg 다운로드
                             </a>
                         </div>
                         <div class="download-card">
                             <i class="fas fa-terminal"></i>
                             <div class="card-info">
                                 <h3>Homebrew</h3>
-                                <p>Install via terminal</p>
+                                <p>터미널에서 설치하기</p>
                             </div>
                             <div class="mini-code">
                                 <code>brew install...</code>
                             </div>
                             <a href="#installation" class="btn-secondary">
-                                See Command
+                                명령어 보기
                             </a>
                         </div>
                         <div class="download-card secondary">
                             <i class="fab fa-github"></i>
                             <div class="card-info">
-                                <h3>Source Code</h3>
-                                <p>Build or contribute</p>
+                                <h3>소스 코드</h3>
+                                <p>직접 빌드하거나 기여하기</p>
                             </div>
                             <a href="https://github.com/hulryung/markdown-prism" class="btn-secondary">
                                 Repository
@@ -241,9 +231,9 @@
                     </div>
 
                     <div class="cta-meta">
-                        <span><i class="fas fa-check"></i> Size: ~15MB</span>
-                        <span><i class="fas fa-check"></i> Req: macOS 14.0+</span>
-                        <a href="https://github.com/hulryung/markdown-prism/releases" class="all-releases">View All Releases <i class="fas fa-external-link-alt"></i></a>
+                        <span><i class="fas fa-check"></i> 크기: 약 15MB</span>
+                        <span><i class="fas fa-check"></i> 요구사항: macOS 14.0+</span>
+                        <a href="https://github.com/hulryung/markdown-prism/releases" class="all-releases">모든 버전 보기 <i class="fas fa-external-link-alt"></i></a>
                     </div>
                 </div>
             </div>
@@ -256,14 +246,14 @@
                 <div class="logo">
                     <i class="fas fa-prism"></i> <span>Markdown Prism</span>
                 </div>
-                <p>The best Markdown tool for macOS users.</p>
+                <p>macOS 사용자를 위한 최고의 마크다운 도구.</p>
             </div>
             <div class="footer-links">
-                <h4>Project</h4>
+                <h4>프로젝트</h4>
                 <ul>
                     <li><a href="https://github.com/hulryung/markdown-prism">GitHub Repository</a></li>
-                    <li><a href="https://github.com/hulryung/markdown-prism/issues">Issue Tracker</a></li>
-                    <li><a href="https://github.com/hulryung/markdown-prism/blob/main/LICENSE">License</a></li>
+                    <li><a href="https://github.com/hulryung/markdown-prism/issues">이슈 제보</a></li>
+                    <li><a href="https://github.com/hulryung/markdown-prism/blob/main/LICENSE">라이선스</a></li>
                 </ul>
             </div>
         </div>
