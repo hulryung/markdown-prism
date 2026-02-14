@@ -1,21 +1,37 @@
 # markdown-prism Progress Report
 
 > Last Updated: 2026-02-14
-> Current Phase: Phase 2 Complete
-> Next: Phase 3 (Quick Look extension)
+> Current Phase: Phase 3-4 Complete (All core phases done)
+> Status: Fully functional macOS markdown editor/viewer
 
 ---
 
-## Phase 2 Summary (Latest)
+## Phase 3-4 Summary (Latest)
 
-> Commit: `764b28d` - "App: add Phase 2 editor with split-pane preview and file operations"
+### Commits
+- `e4dfa3d` - App: add Info.plist with UTType declarations and default window size
+- `068c5fa` - Editor: add markdown syntax highlighting
+- `3817b58` - Preview: bundle JS/CSS libraries locally for offline support
+- `233f636` - App: improve file handling and save robustness
 
 ### 새로 추가된 파일
-- `Sources/MarkdownPrism/Views/EditorView.swift` (71줄) - NSTextView 래퍼, 모노스페이스 폰트, undo 지원
+- `Sources/MarkdownPrism/Info.plist` - 앱 메타데이터, UTType, 파일 연결
+- `Sources/MarkdownPrism/Models/MarkdownHighlighter.swift` - Regex 기반 구문 하이라이팅
+- `Sources/MarkdownPrism/Resources/vendor/` - 로컬 번들 JS/CSS (30파일)
+  - markdown-it, highlight.js, KaTeX (+ 20 woff2 폰트), Mermaid
 
-### 수정된 파일
-- `ContentView.swift` (232줄 추가) - HSplitView, 디바운스, Save/SaveAs/New, modified indicator
-- `MarkdownPrismApp.swift` (36줄 추가) - File 메뉴 커맨드 (FocusedValue 브릿지)
+### 주요 변경
+- **오프라인 지원**: 모든 CDN 의존성 로컬 번들링 (vendor/)
+- **에디터 구문 하이라이팅**: 헤더(파란), 볼드/이탤릭, 코드(회색 배경), 링크, 리스트(주황)
+- **앱 메타데이터**: Info.plist, UTType (.md/.markdown/.mdown/.mkd), 기본 윈도우 1200x800
+- **파일 인코딩**: UTF-8 + fallback (UTF-16, Latin1 등)
+- **Save 안정성**: 반환값 기반 성공 추적, 드롭 시 미저장 확인
+
+---
+
+## Phase 2 Summary
+
+> Commit: `764b28d` - "App: add Phase 2 editor with split-pane preview and file operations"
 
 ### 주요 기능
 - HSplitView 에디터 + 프리뷰 split pane (드래그 가능 디바이더)
@@ -25,10 +41,10 @@
 - 수정 표시 (제목표시줄 "-- Edited")
 - 미저장 변경 확인 다이얼로그
 
-### Phase 2 남은 이슈
-- [ ] 에디터 마크다운 구문 하이라이팅 (현재 plain monospace)
-- [ ] 스크롤 동기화 (에디터 ↔ 프리뷰)
-- [ ] 에디터 줄번호 표시
+### 해결된 이전 이슈
+- [x] 에디터 마크다운 구문 하이라이팅 (068c5fa)
+- [ ] 스크롤 동기화 (에디터 ↔ 프리뷰) - 향후
+- [ ] 에디터 줄번호 표시 - 향후
 
 ---
 
@@ -220,21 +236,23 @@ markdown-it의 strikethrough는 기본 비활성. `{ breaks: false }` 설정은 
 - [ ] 에디터 마크다운 구문 하이라이팅
 - [ ] 스크롤 동기화 (에디터 ↔ 프리뷰)
 
-## Phase 3 계획: Quick Look Extension
+## 남은 작업 (Future)
 
+### Quick Look Extension
 - .appex 번들 형태 (macOS 15+ 필수)
 - QLPreviewingController 프로토콜 구현
-- preview.html + css/style.css 렌더러 재사용
-- UTType 선언: public.markdown, net.daringfireball.markdown
+- preview.html + vendor/ 렌더러 재사용
+- 별도 Xcode 프로젝트 또는 타겟 필요 (SPM은 app extension 미지원)
 
-## Phase 4 계획: Polish
-
+### Polish
 - 테마 선택 (GitHub Light/Dark, Dracula 등)
-- JS 라이브러리 로컬 번들링 (오프라인 지원)
 - 환경설정 패널 (폰트 크기, 테마, 에디터 설정)
 - 앱 아이콘 및 About 다이얼로그
-- Info.plist + UTType 파일 연결
+- 스크롤 동기화 (에디터 ↔ 프리뷰)
+- 에디터 줄번호 표시
 - 성능 최적화 (대용량 파일)
+- 탭 지원 (다중 파일)
+- 최근 파일 목록
 
 ---
 
