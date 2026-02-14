@@ -11,6 +11,9 @@ let package = Package(
         .executableTarget(
             name: "MarkdownPrism",
             path: "Sources/MarkdownPrism",
+            exclude: [
+                "Info.plist"
+            ],
             resources: [
                 .copy("Resources")
             ]
