@@ -9,6 +9,10 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
+    ENABLE_HARDENED_RUNTIME: true
+  configs:
+    Release:
+      CODE_SIGN_INJECT_BASE_ENTITLEMENTS: false
 
 targets:
   MarkdownPrism:
