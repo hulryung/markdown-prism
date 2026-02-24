@@ -108,6 +108,24 @@
 
       window.renderMarkdown = renderMarkdown;
       renderMarkdown('');
+
+      // Intercept link clicks and delegate to native app
+      document.addEventListener('click', function (e) {
+        var target = e.target;
+        while (target && target.tagName !== 'A') {
+          target = target.parentElement;
+        }
+        if (target && target.tagName === 'A') {
+          var href = target.getAttribute('href');
+          if (href && href.charAt(0) !== '#') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.linkClicked) {
+              window.webkit.messageHandlers.linkClicked.postMessage(href);
+            }
+          }
+        }
+      });
     });
   </script>
 </head>

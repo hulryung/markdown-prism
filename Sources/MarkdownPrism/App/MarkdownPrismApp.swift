@@ -7,6 +7,18 @@ class OpenFileState: ObservableObject {
 class AppDelegate: NSObject, NSApplicationDelegate {
     let openFileState = OpenFileState()
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Ensure the app appears as a regular app with Dock icon and menu bar
+        NSApplication.shared.setActivationPolicy(.regular)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+
+        // Load app icon from bundled resource (xcassets not available in SPM builds)
+        if let iconURL = Bundle.module.url(forResource: "AppIcon", withExtension: "png", subdirectory: "Resources"),
+           let icon = NSImage(contentsOf: iconURL) {
+            NSApplication.shared.applicationIconImage = icon
+        }
+    }
+
     func application(_ application: NSApplication, open urls: [URL]) {
         guard let url = urls.first else { return }
         openFileState.pendingURL = url

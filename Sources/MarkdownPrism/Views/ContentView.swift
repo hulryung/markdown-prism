@@ -18,7 +18,9 @@ struct ContentView: View {
                 EditorView(text: $markdownText)
                     .frame(minWidth: 300)
             }
-            PreviewView(markdown: previewText)
+            PreviewView(markdown: previewText, fileURL: fileURL, onOpenFile: { url in
+                    loadFile(url)
+                })
                 .frame(minWidth: 300)
         }
         .frame(minWidth: 900, minHeight: 600)
