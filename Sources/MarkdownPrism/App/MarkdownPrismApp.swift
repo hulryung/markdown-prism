@@ -13,10 +13,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.activate(ignoringOtherApps: true)
 
         // Load app icon from bundled resource (xcassets not available in SPM builds)
+        #if SWIFT_PACKAGE
         if let iconURL = Bundle.module.url(forResource: "AppIcon", withExtension: "png", subdirectory: "Resources"),
            let icon = NSImage(contentsOf: iconURL) {
             NSApplication.shared.applicationIconImage = icon
         }
+        #endif
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
