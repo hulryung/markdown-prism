@@ -19,6 +19,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSApplication.shared.applicationIconImage = icon
         }
         #endif
+
+        // Open file passed as command-line argument
+        let args = ProcessInfo.processInfo.arguments
+        if args.count > 1 {
+            let path = args[1]
+            let url = URL(fileURLWithPath: path)
+            if FileManager.default.fileExists(atPath: url.path) {
+                openFileState.pendingURL = url
+            }
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
