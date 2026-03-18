@@ -19,6 +19,8 @@
   <script src="vendor/markdown-it.min.js"></script>
   <!-- markdown-it-task-lists (was: https://cdn.jsdelivr.net/npm/markdown-it-task-lists@2.1.1/index.min.js) -->
   <script src="vendor/markdown-it-task-lists.min.js"></script>
+  <!-- markdown-it-emoji (was: https://cdn.jsdelivr.net/npm/markdown-it-emoji@3.0.0/dist/markdown-it-emoji.min.js) -->
+  <script src="vendor/markdown-it-emoji.min.js"></script>
   <!-- Mermaid UMD (was: https://cdn.jsdelivr.net/npm/mermaid@11.12.0/+esm via ES module import) -->
   <script src="vendor/mermaid.min.js"></script>
   <script>
@@ -56,6 +58,10 @@
 
       if (window.markdownitTaskLists) {
         md.use(window.markdownitTaskLists, { enabled: false, label: true, labelAfter: true });
+      }
+
+      if (window.markdownitEmoji) {
+        md.use(window.markdownitEmoji);
       }
 
       function renderMermaidBlocks() {
