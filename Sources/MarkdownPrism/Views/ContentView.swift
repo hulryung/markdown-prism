@@ -55,6 +55,17 @@ struct ContentView: View {
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(fileURL == nil)
             }
+            ToolbarItemGroup(placement: .automatic) {
+                Button(action: zoomOut) {
+                    Label("Zoom Out", systemImage: "minus.magnifyingglass")
+                }
+                .disabled(!zoomState.canZoomOut)
+
+                Button(action: zoomIn) {
+                    Label("Zoom In", systemImage: "plus.magnifyingglass")
+                }
+                .disabled(!zoomState.canZoomIn)
+            }
         }
         .navigationTitle(windowTitle)
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
