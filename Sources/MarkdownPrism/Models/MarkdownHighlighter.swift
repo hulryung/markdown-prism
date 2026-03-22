@@ -1,7 +1,24 @@
 import AppKit
 
 final class MarkdownHighlighter {
-    private let baseFont = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+    var fontSize: CGFloat {
+        didSet {
+            markdownRules = Self.makeMarkdownRules(fontSize: fontSize)
+        }
+    }
+
+    var baseFont: NSFont {
+        Self.makeBaseFont(fontSize: fontSize)
+    }
+
+    var boldFont: NSFont {
+        Self.makeBoldFont(fontSize: fontSize)
+    }
+
+    var headerFont: NSFont {
+        Self.makeHeaderFont(fontSize: fontSize)
+    }
+
     private let baseColor = NSColor.labelColor
 
     private let codeBlockPattern: NSRegularExpression?
@@ -12,16 +29,42 @@ final class MarkdownHighlighter {
         let attributes: [NSAttributedString.Key: Any]
     }
 
-    private let markdownRules: [HighlightRule]
+    private var markdownRules: [HighlightRule]
 
-    init() {
+    init(fontSize: CGFloat = ZoomState.baseEditorFontSize) {
+        self.fontSize = fontSize
         codeBlockPattern = try? NSRegularExpression(pattern: "^```[\\s\\S]*?^```", options: .anchorsMatchLines)
         inlineCodePattern = try? NSRegularExpression(pattern: "`[^`\n]+`", options: [])
+        markdownRules = Self.makeMarkdownRules(fontSize: fontSize)
+    }
 
+    private static func makeBaseFont(fontSize: CGFloat) -> NSFont {
+        NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+    }
+
+    private static func makeBoldFont(fontSize: CGFloat) -> NSFont {
+        NSFont.monospacedSystemFont(ofSize: fontSize, weight: .bold)
+    }
+
+    private static func makeHeaderFont(fontSize: CGFloat) -> NSFont {
+        NSFont.monospacedSystemFont(ofSize: fontSize, weight: .bold)
+    }
+
+    private static func makeItalicFont(fontSize: CGFloat) -> NSFont {
+        let italicDescriptor = NSFontDescriptor(fontAttributes: [
+            .family: "Menlo",
+            .face: "Italic"
+        ])
+
+        return NSFont(descriptor: italicDescriptor, size: fontSize)
+            ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+    }
+
+    private static func makeMarkdownRules(fontSize: CGFloat) -> [HighlightRule] {
         var rules: [HighlightRule] = []
-
-        let boldFont = NSFont.monospacedSystemFont(ofSize: 14, weight: .bold)
-        let headerFont = NSFont.monospacedSystemFont(ofSize: 14, weight: .bold)
+        let boldFont = makeBoldFont(fontSize: fontSize)
+        let headerFont = makeHeaderFont(fontSize: fontSize)
+        let italicFont = makeItalicFont(fontSize: fontSize)
 
         // Headers
         if let regex = try? NSRegularExpression(pattern: "^#{1,6}\\s.+$", options: .anchorsMatchLines) {
@@ -40,12 +83,6 @@ final class MarkdownHighlighter {
 
         // Italic
         if let regex = try? NSRegularExpression(pattern: "(?<!\\*)\\*(?!\\*).+?(?<!\\*)\\*(?!\\*)|(?<!_)_(?!_).+?(?<!_)_(?!_)", options: []) {
-            let italicDescriptor = NSFontDescriptor(fontAttributes: [
-                .family: "Menlo",
-                .face: "Italic"
-            ])
-            let italicFont = NSFont(descriptor: italicDescriptor, size: 14)
-                ?? NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
             rules.append(HighlightRule(pattern: regex, attributes: [
                 .font: italicFont
             ]))
@@ -79,7 +116,7 @@ final class MarkdownHighlighter {
             ]))
         }
 
-        self.markdownRules = rules
+        return rules
     }
 
     func highlight(_ textStorage: NSTextStorage) {

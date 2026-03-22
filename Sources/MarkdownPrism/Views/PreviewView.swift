@@ -3,6 +3,7 @@ import WebKit
 
 struct PreviewView: NSViewRepresentable {
     let markdown: String
+    let zoomScale: Double
     var fileURL: URL?
     var onOpenFile: ((URL) -> Void)?
 
@@ -16,8 +17,10 @@ struct PreviewView: NSViewRepresentable {
         config.userContentController.add(handler, name: "linkClicked")
 
         let webView = WKWebView(frame: .zero, configuration: config)
+        webView.pageZoom = zoomScale
         webView.navigationDelegate = context.coordinator
         context.coordinator.webView = webView
+        context.coordinator.currentZoomScale = zoomScale
         context.coordinator.fileURL = fileURL
         context.coordinator.onOpenFile = onOpenFile
 
@@ -46,10 +49,12 @@ struct PreviewView: NSViewRepresentable {
 
     func updateNSView(_ webView: WKWebView, context: Context) {
         context.coordinator.currentMarkdown = markdown
+        context.coordinator.currentZoomScale = zoomScale
         context.coordinator.fileURL = fileURL
         context.coordinator.onOpenFile = onOpenFile
         if context.coordinator.isLoaded {
-            context.coordinator.renderCurrentMarkdown()
+            context.coordinator.applyZoomIfNeeded()
+            context.coordinator.renderCurrentMarkdownIfNeeded()
         }
     }
 
@@ -57,12 +62,15 @@ struct PreviewView: NSViewRepresentable {
         weak var webView: WKWebView?
         var isLoaded = false
         var currentMarkdown = ""
+        var renderedMarkdown = ""
+        var currentZoomScale = ZoomState.defaultScale
         var fileURL: URL?
         var onOpenFile: ((URL) -> Void)?
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             isLoaded = true
-            renderCurrentMarkdown()
+            applyZoomIfNeeded()
+            renderCurrentMarkdownIfNeeded(force: true)
         }
 
         func webView(
@@ -88,8 +96,22 @@ struct PreviewView: NSViewRepresentable {
             handleLinkClick(href: href)
         }
 
-        func renderCurrentMarkdown() {
+        func applyZoomIfNeeded() {
+            guard let webView else {
+                return
+            }
+
+            if webView.pageZoom != currentZoomScale {
+                webView.pageZoom = currentZoomScale
+            }
+        }
+
+        func renderCurrentMarkdownIfNeeded(force: Bool = false) {
             guard let webView, isLoaded else {
+                return
+            }
+
+            guard force || renderedMarkdown != currentMarkdown else {
                 return
             }
 
@@ -105,6 +127,7 @@ struct PreviewView: NSViewRepresentable {
                     print("render error: \(error.localizedDescription)")
                 }
             }
+            renderedMarkdown = currentMarkdown
         }
 
         private func handleLinkClick(href: String) {

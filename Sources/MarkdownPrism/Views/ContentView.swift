@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @EnvironmentObject private var openFileState: OpenFileState
+    @AppStorage("zoomScale") private var zoomScale = ZoomState.defaultScale
     @State private var markdownText = ContentView.welcomeMarkdown
     @State private var previewText = ContentView.welcomeMarkdown
     @State private var fileURL: URL?
@@ -15,10 +16,10 @@ struct ContentView: View {
     var body: some View {
         HSplitView {
             if showEditor {
-                EditorView(text: $markdownText)
+                EditorView(text: $markdownText, fontSize: zoomState.editorFontSize)
                     .frame(minWidth: 300)
             }
-            PreviewView(markdown: previewText, fileURL: fileURL, onOpenFile: { url in
+            PreviewView(markdown: previewText, zoomScale: zoomState.zoomScale, fileURL: fileURL, onOpenFile: { url in
                     loadFile(url)
                 })
                 .frame(minWidth: 300)
@@ -89,6 +90,9 @@ struct ContentView: View {
         .focusedSceneValue(\.openFileAction, { openFile() })
         .focusedSceneValue(\.saveFileAction, isModified ? { _ = saveFile() } : nil)
         .focusedSceneValue(\.saveAsFileAction, { _ = saveAsFile() })
+        .focusedSceneValue(\.zoomInAction, zoomState.canZoomIn ? { zoomIn() } : nil)
+        .focusedSceneValue(\.zoomOutAction, zoomState.canZoomOut ? { zoomOut() } : nil)
+        .focusedSceneValue(\.resetZoomAction, zoomState.zoomScale == ZoomState.defaultScale ? nil : { resetZoom() })
     }
 
     private var windowTitle: String {
@@ -98,11 +102,33 @@ struct ContentView: View {
         return isModified ? "\(name) \u{2014} Edited" : name
     }
 
+    private var zoomState: ZoomState {
+        ZoomState(zoomScale: zoomScale)
+    }
+
     private func setDocumentText(_ text: String, modified: Bool) {
         ignoreNextTextChange = true
         markdownText = text
         previewText = text
         isModified = modified
+    }
+
+    private func zoomIn() {
+        var nextZoomState = zoomState
+        nextZoomState.zoomIn()
+        zoomScale = nextZoomState.zoomScale
+    }
+
+    private func zoomOut() {
+        var nextZoomState = zoomState
+        nextZoomState.zoomOut()
+        zoomScale = nextZoomState.zoomScale
+    }
+
+    private func resetZoom() {
+        var nextZoomState = zoomState
+        nextZoomState.reset()
+        zoomScale = nextZoomState.zoomScale
     }
 
     private func schedulePreviewUpdate(_ text: String) {
@@ -409,6 +435,18 @@ private struct SaveAsFileActionKey: FocusedValueKey {
     typealias Value = () -> Void
 }
 
+private struct ZoomInActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
+private struct ZoomOutActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
+private struct ResetZoomActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
 extension FocusedValues {
     var newFileAction: (() -> Void)? {
         get { self[NewFileActionKey.self] }
@@ -428,5 +466,20 @@ extension FocusedValues {
     var saveAsFileAction: (() -> Void)? {
         get { self[SaveAsFileActionKey.self] }
         set { self[SaveAsFileActionKey.self] = newValue }
+    }
+
+    var zoomInAction: (() -> Void)? {
+        get { self[ZoomInActionKey.self] }
+        set { self[ZoomInActionKey.self] = newValue }
+    }
+
+    var zoomOutAction: (() -> Void)? {
+        get { self[ZoomOutActionKey.self] }
+        set { self[ZoomOutActionKey.self] = newValue }
+    }
+
+    var resetZoomAction: (() -> Void)? {
+        get { self[ResetZoomActionKey.self] }
+        set { self[ResetZoomActionKey.self] = newValue }
     }
 }
