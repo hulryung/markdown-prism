@@ -3,6 +3,7 @@ import AppKit
 
 struct EditorView: NSViewRepresentable {
     @Binding var text: String
+    let fontSize: CGFloat
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -16,7 +17,7 @@ struct EditorView: NSViewRepresentable {
         scrollView.borderType = .noBorder
 
         let textView = NSTextView()
-        textView.font = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+        textView.font = context.coordinator.highlighter.baseFont
         textView.isEditable = true
         textView.isSelectable = true
         textView.allowsUndo = true
@@ -39,6 +40,7 @@ struct EditorView: NSViewRepresentable {
 
         textView.delegate = context.coordinator
         context.coordinator.textView = textView
+        context.coordinator.applyTypingAttributes(to: textView)
 
         textView.string = text
         context.coordinator.highlighter.highlight(textView.textStorage!)
@@ -49,9 +51,17 @@ struct EditorView: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
+        context.coordinator.parent = self
+        context.coordinator.highlighter.fontSize = fontSize
+        context.coordinator.applyTypingAttributes(to: textView)
+
         if textView.string != text {
             let selectedRanges = textView.selectedRanges
             textView.string = text
+            context.coordinator.highlighter.highlight(textView.textStorage!)
+            textView.selectedRanges = selectedRanges
+        } else {
+            let selectedRanges = textView.selectedRanges
             context.coordinator.highlighter.highlight(textView.textStorage!)
             textView.selectedRanges = selectedRanges
         }
@@ -60,10 +70,11 @@ struct EditorView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: EditorView
         weak var textView: NSTextView?
-        let highlighter = MarkdownHighlighter()
+        let highlighter: MarkdownHighlighter
 
         init(_ parent: EditorView) {
             self.parent = parent
+            highlighter = MarkdownHighlighter(fontSize: parent.fontSize)
         }
 
         func textDidChange(_ notification: Notification) {
@@ -73,6 +84,12 @@ struct EditorView: NSViewRepresentable {
             let selectedRanges = textView.selectedRanges
             highlighter.highlight(textView.textStorage!)
             textView.selectedRanges = selectedRanges
+        }
+
+        func applyTypingAttributes(to textView: NSTextView) {
+            textView.font = highlighter.baseFont
+            textView.typingAttributes[.font] = highlighter.baseFont
+            textView.typingAttributes[.foregroundColor] = NSColor.labelColor
         }
     }
 }

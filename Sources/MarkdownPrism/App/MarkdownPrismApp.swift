@@ -58,6 +58,9 @@ struct FileCommands: Commands {
     @FocusedValue(\.openFileAction) var openFileAction
     @FocusedValue(\.saveFileAction) var saveFileAction
     @FocusedValue(\.saveAsFileAction) var saveAsFileAction
+    @FocusedValue(\.zoomInAction) var zoomInAction
+    @FocusedValue(\.zoomOutAction) var zoomOutAction
+    @FocusedValue(\.resetZoomAction) var resetZoomAction
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -83,6 +86,26 @@ struct FileCommands: Commands {
                 saveAsFileAction?()
             }
             .keyboardShortcut("s", modifiers: [.command, .shift])
+        }
+
+        CommandGroup(after: .toolbar) {
+            Button("Zoom In") {
+                zoomInAction?()
+            }
+            .keyboardShortcut("=", modifiers: .command)
+            .disabled(zoomInAction == nil)
+
+            Button("Zoom Out") {
+                zoomOutAction?()
+            }
+            .keyboardShortcut("-", modifiers: .command)
+            .disabled(zoomOutAction == nil)
+
+            Button("Actual Size") {
+                resetZoomAction?()
+            }
+            .keyboardShortcut("0", modifiers: .command)
+            .disabled(resetZoomAction == nil)
         }
     }
 }
