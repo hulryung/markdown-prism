@@ -10,7 +10,6 @@ struct ContentView: View {
     @State private var fileWatcher: FileWatcher?
     @State private var showEditor = true
     @State private var debounceWork: DispatchWorkItem?
-    @State private var isModified = false
     @State private var ignoreNextTextChange = false
     @State private var isSearchVisible = false
     @State private var searchText = ""
@@ -88,7 +87,7 @@ struct ContentView: View {
                     Label("Save", systemImage: "square.and.arrow.down")
                 }
                 .keyboardShortcut("s", modifiers: .command)
-                .disabled(!isModified)
+                .disabled(!openFileState.isModified)
             }
             ToolbarItem(placement: .automatic) {
                 Button(action: refreshFile) {
@@ -123,6 +122,7 @@ struct ContentView: View {
             }
         }
         .onAppear {
+            openFileState.saveHandler = { self.saveFile() }
             if let url = openFileState.pendingURL {
                 openFileState.pendingURL = nil
                 loadFile(url)
@@ -141,7 +141,7 @@ struct ContentView: View {
         }
         .focusedSceneValue(\.newFileAction, { newFileAction() })
         .focusedSceneValue(\.openFileAction, { openFile() })
-        .focusedSceneValue(\.saveFileAction, isModified ? { _ = saveFile() } : nil)
+        .focusedSceneValue(\.saveFileAction, openFileState.isModified ? { _ = saveFile() } : nil)
         .focusedSceneValue(\.saveAsFileAction, { _ = saveAsFile() })
         .focusedSceneValue(\.zoomInAction, zoomState.canZoomIn ? { zoomIn() } : nil)
         .focusedSceneValue(\.zoomOutAction, zoomState.canZoomOut ? { zoomOut() } : nil)
@@ -152,7 +152,7 @@ struct ContentView: View {
         guard let name = fileURL?.lastPathComponent else {
             return "Markdown Prism"
         }
-        return isModified ? "\(name) \u{2014} Edited" : name
+        return openFileState.isModified ? "\(name) \u{2014} Edited" : name
     }
 
     private var zoomState: ZoomState {
@@ -199,7 +199,7 @@ struct ContentView: View {
         ignoreNextTextChange = true
         markdownText = text
         previewText = text
-        isModified = modified
+        openFileState.isModified = modified
     }
 
     private func zoomIn() {
@@ -252,7 +252,7 @@ struct ContentView: View {
         debounceWork?.cancel()
         let work = DispatchWorkItem {
             previewText = text
-            isModified = true
+            openFileState.isModified = true
         }
         debounceWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
@@ -261,7 +261,7 @@ struct ContentView: View {
     // MARK: - File Actions
 
     private func newFileAction() {
-        if isModified {
+        if openFileState.isModified {
             guard confirmDiscardChanges() else { return }
         }
         fileWatcher?.stop()
@@ -271,7 +271,7 @@ struct ContentView: View {
     }
 
     private func openFile() {
-        if isModified {
+        if openFileState.isModified {
             guard confirmDiscardChanges() else { return }
         }
 
@@ -325,7 +325,7 @@ struct ContentView: View {
     private func writeFile(to url: URL) -> Bool {
         do {
             try markdownText.write(to: url, atomically: true, encoding: .utf8)
-            isModified = false
+            openFileState.isModified = false
             return true
         } catch {
             let alert = NSAlert()
@@ -414,7 +414,7 @@ struct ContentView: View {
             }
 
             DispatchQueue.main.async {
-                if self.isModified {
+                if self.openFileState.isModified {
                     guard self.confirmDiscardChanges() else {
                         return
                     }

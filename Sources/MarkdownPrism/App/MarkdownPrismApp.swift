@@ -2,9 +2,11 @@ import SwiftUI
 
 class OpenFileState: ObservableObject {
     @Published var pendingURL: URL?
+    @Published var isModified = false
+    var saveHandler: (() -> Bool)?
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let openFileState = OpenFileState()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -29,11 +31,51 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 openFileState.pendingURL = url
             }
         }
+
+        // Set window delegate after SwiftUI creates the window
+        DispatchQueue.main.async {
+            for window in NSApplication.shared.windows {
+                window.delegate = self
+            }
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
         guard let url = urls.first else { return }
         openFileState.pendingURL = url
+    }
+
+    // MARK: - NSWindowDelegate
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        confirmSaveIfNeeded()
+    }
+
+    // MARK: - App Termination
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        confirmSaveIfNeeded() ? .terminateNow : .terminateCancel
+    }
+
+    private func confirmSaveIfNeeded() -> Bool {
+        guard openFileState.isModified else { return true }
+
+        let alert = NSAlert()
+        alert.messageText = "You have unsaved changes"
+        alert.informativeText = "Do you want to save your changes before closing?"
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Don't Save")
+        alert.addButton(withTitle: "Cancel")
+        alert.alertStyle = .warning
+
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            return openFileState.saveHandler?() ?? false
+        case .alertSecondButtonReturn:
+            return true
+        default:
+            return false
+        }
     }
 }
 
