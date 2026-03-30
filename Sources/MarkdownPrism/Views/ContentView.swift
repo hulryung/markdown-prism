@@ -18,31 +18,47 @@ struct ContentView: View {
     @State private var searchCurrentMatch = 0
     @State private var searchRevision = 0
     @State private var findBarFocusTrigger = 0
+    @State private var isRegex = false
+    @State private var replaceText = ""
+    @State private var isReplaceVisible = false
+    @State private var replaceRevision = 0
+    @State private var replaceAllRevision = 0
 
     var body: some View {
         innerBody
-            .focusedSceneValue(\.zoomInAction, zoomState.canZoomIn ? { zoomIn() } : nil)
-            .focusedSceneValue(\.zoomOutAction, zoomState.canZoomOut ? { zoomOut() } : nil)
-            .focusedSceneValue(\.resetZoomAction, zoomState.zoomScale == ZoomState.defaultScale ? nil : { resetZoom() })
             .focusedSceneValue(\.findAction, { showSearch() })
             .focusedSceneValue(\.findNextAction, isSearchVisible ? { findNext() } : nil)
             .focusedSceneValue(\.findPreviousAction, isSearchVisible ? { findPrevious() } : nil)
-        .focusedSceneValue(\.dismissFindAction, isSearchVisible ? { dismissSearch() } : nil)
+            .focusedSceneValue(\.dismissFindAction, isSearchVisible ? { dismissSearch() } : nil)
+            .focusedSceneValue(\.showReplaceAction, { showReplace() })
+    }
+
+
+
+    @ViewBuilder
+    private var findBar: some View {
+        if isSearchVisible {
+            FindBarView(
+                searchText: $searchText,
+                replaceText: $replaceText,
+                isRegex: $isRegex,
+                isReplaceVisible: isReplaceVisible,
+                matchCount: searchMatchCount,
+                currentMatch: searchCurrentMatch,
+                focusTrigger: findBarFocusTrigger,
+                onNext: findNext,
+                onPrevious: findPrevious,
+                onDismiss: dismissSearch,
+                onToggleReplace: { isReplaceVisible.toggle() },
+                onReplace: { replaceRevision += 1 },
+                onReplaceAll: { replaceAllRevision += 1 }
+            )
+        }
     }
 
     private var innerBody: some View {
         VStack(spacing: 0) {
-            if isSearchVisible {
-                FindBarView(
-                    searchText: $searchText,
-                    matchCount: searchMatchCount,
-                    currentMatch: searchCurrentMatch,
-                    focusTrigger: findBarFocusTrigger,
-                    onNext: findNext,
-                    onPrevious: findPrevious,
-                    onDismiss: dismissSearch
-                )
-            }
+            findBar
             HSplitView {
                 if showEditor {
                     editorPane
@@ -127,6 +143,9 @@ struct ContentView: View {
         .focusedSceneValue(\.openFileAction, { openFile() })
         .focusedSceneValue(\.saveFileAction, isModified ? { _ = saveFile() } : nil)
         .focusedSceneValue(\.saveAsFileAction, { _ = saveAsFile() })
+        .focusedSceneValue(\.zoomInAction, zoomState.canZoomIn ? { zoomIn() } : nil)
+        .focusedSceneValue(\.zoomOutAction, zoomState.canZoomOut ? { zoomOut() } : nil)
+        .focusedSceneValue(\.resetZoomAction, zoomState.zoomScale == ZoomState.defaultScale ? nil : { resetZoom() })
     }
 
     private var windowTitle: String {
@@ -145,8 +164,18 @@ struct ContentView: View {
     }
 
     private var editorPane: some View {
-        EditorView(text: $markdownText, fontSize: zoomState.editorFontSize, searchText: activeSearchText, searchRevision: searchRevision, onEscapePressed: isSearchVisible ? dismissSearch : nil)
-            .frame(minWidth: 300)
+        EditorView(
+            text: $markdownText,
+            fontSize: zoomState.editorFontSize,
+            searchText: activeSearchText,
+            searchRevision: searchRevision,
+            isRegex: isRegex,
+            replaceText: replaceText,
+            replaceRevision: replaceRevision,
+            replaceAllRevision: replaceAllRevision,
+            onEscapePressed: isSearchVisible ? dismissSearch : nil
+        )
+        .frame(minWidth: 300)
     }
 
     private var previewPane: some View {
@@ -155,6 +184,7 @@ struct ContentView: View {
             zoomScale: zoomState.zoomScale,
             searchText: activeSearchText,
             searchRevision: searchRevision,
+            isRegex: isRegex,
             fileURL: fileURL,
             onOpenFile: { url in loadFile(url) },
             onSearchResults: { count, current in
@@ -197,9 +227,17 @@ struct ContentView: View {
 
     private func dismissSearch() {
         isSearchVisible = false
+        isReplaceVisible = false
         searchText = ""
+        replaceText = ""
         searchMatchCount = 0
         searchCurrentMatch = 0
+    }
+
+    private func showReplace() {
+        isSearchVisible = true
+        isReplaceVisible = true
+        findBarFocusTrigger += 1
     }
 
     private func findNext() {
@@ -542,6 +580,10 @@ private struct DismissFindActionKey: FocusedValueKey {
     typealias Value = () -> Void
 }
 
+private struct ShowReplaceActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
 extension FocusedValues {
     var newFileAction: (() -> Void)? {
         get { self[NewFileActionKey.self] }
@@ -596,5 +638,10 @@ extension FocusedValues {
     var dismissFindAction: (() -> Void)? {
         get { self[DismissFindActionKey.self] }
         set { self[DismissFindActionKey.self] = newValue }
+    }
+
+    var showReplaceAction: (() -> Void)? {
+        get { self[ShowReplaceActionKey.self] }
+        set { self[ShowReplaceActionKey.self] = newValue }
     }
 }

@@ -65,6 +65,7 @@ struct FileCommands: Commands {
     @FocusedValue(\.findNextAction) var findNextAction
     @FocusedValue(\.findPreviousAction) var findPreviousAction
     @FocusedValue(\.dismissFindAction) var dismissFindAction
+    @FocusedValue(\.showReplaceAction) var showReplaceAction
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -129,6 +130,11 @@ struct FileCommands: Commands {
             }
             .keyboardShortcut("g", modifiers: [.command, .shift])
             .disabled(findPreviousAction == nil)
+
+            Button("Find & Replace…") {
+                showReplaceAction?()
+            }
+            .keyboardShortcut("f", modifiers: [.command, .option])
 
             Button("Dismiss Find") {
                 dismissFindAction?()

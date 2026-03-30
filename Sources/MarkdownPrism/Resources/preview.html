@@ -130,7 +130,30 @@
         _findCurrentIndex = -1;
       }
 
-      function findInPreview(query) {
+      function getMatchesInText(text, query, useRegex) {
+        var matches = [];
+        if (useRegex) {
+          try {
+            var re = new RegExp(query, 'gi');
+            var m;
+            while ((m = re.exec(text)) !== null) {
+              matches.push({ idx: m.index, len: m[0].length });
+              if (m[0].length === 0) re.lastIndex++;
+            }
+          } catch (e) { /* invalid regex */ }
+        } else {
+          var qLower = query.toLowerCase();
+          var tLower = text.toLowerCase();
+          var idx = tLower.indexOf(qLower);
+          while (idx !== -1) {
+            matches.push({ idx: idx, len: query.length });
+            idx = tLower.indexOf(qLower, idx + query.length);
+          }
+        }
+        return matches;
+      }
+
+      function findInPreview(query, useRegex) {
         clearFindHighlights();
         if (!query) return { count: 0, current: 0 };
 
@@ -139,26 +162,23 @@
         var textNodes = [];
         while (walker.nextNode()) textNodes.push(walker.currentNode);
 
-        var queryLower = query.toLowerCase();
-
         for (var n = 0; n < textNodes.length; n++) {
           var node = textNodes[n];
           var text = node.textContent;
-          var lower = text.toLowerCase();
-          var idx = lower.indexOf(queryLower);
-          if (idx === -1) continue;
+          var nodeMatches = getMatchesInText(text, query, useRegex);
+          if (nodeMatches.length === 0) continue;
 
           var frag = document.createDocumentFragment();
           var last = 0;
 
-          while (idx !== -1) {
-            if (idx > last) frag.appendChild(document.createTextNode(text.substring(last, idx)));
+          for (var i = 0; i < nodeMatches.length; i++) {
+            var m = nodeMatches[i];
+            if (m.idx > last) frag.appendChild(document.createTextNode(text.substring(last, m.idx)));
             var mark = document.createElement('mark');
             mark.className = 'search-highlight';
-            mark.textContent = text.substring(idx, idx + query.length);
+            mark.textContent = text.substring(m.idx, m.idx + m.len);
             frag.appendChild(mark);
-            last = idx + query.length;
-            idx = lower.indexOf(queryLower, last);
+            last = m.idx + m.len;
           }
 
           if (last < text.length) frag.appendChild(document.createTextNode(text.substring(last)));

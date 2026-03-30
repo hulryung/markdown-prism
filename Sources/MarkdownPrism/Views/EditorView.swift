@@ -6,6 +6,10 @@ struct EditorView: NSViewRepresentable {
     let fontSize: CGFloat
     let searchText: String
     let searchRevision: Int
+    let isRegex: Bool
+    let replaceText: String
+    let replaceRevision: Int
+    let replaceAllRevision: Int
     var onEscapePressed: (() -> Void)?
 
     func makeCoordinator() -> Coordinator {
@@ -69,6 +73,7 @@ struct EditorView: NSViewRepresentable {
             context.coordinator.highlighter.highlight(textView.textStorage!)
             textView.selectedRanges = selectedRanges
         }
+        context.coordinator.handleReplaceIfNeeded(in: textView)
         context.coordinator.updateSearchHighlights(in: textView)
     }
 
@@ -109,10 +114,13 @@ struct EditorView: NSViewRepresentable {
             textView.typingAttributes[.foregroundColor] = NSColor.labelColor
         }
 
+        // MARK: - Search
+
         private var searchMatches: [NSRange] = []
         private var searchMatchIndex = -1
         private var appliedSearchText = ""
         private var appliedSearchRevision = 0
+        private var appliedIsRegex = false
 
         func updateSearchHighlights(in textView: NSTextView) {
             guard let layoutManager = textView.layoutManager,
@@ -131,22 +139,36 @@ struct EditorView: NSViewRepresentable {
 
             // Find all matches
             var matches: [NSRange] = []
-            let nsString = textStorage.string as NSString
-            var range = NSRange(location: 0, length: nsString.length)
-            while range.location < nsString.length {
-                let found = nsString.range(of: query, options: .caseInsensitive, range: range)
-                guard found.location != NSNotFound else { break }
-                matches.append(found)
-                range.location = found.location + found.length
-                range.length = nsString.length - range.location
+            let text = textStorage.string
+            let nsString = text as NSString
+
+            if parent.isRegex {
+                guard let regex = try? NSRegularExpression(pattern: query, options: .caseInsensitive) else {
+                    searchMatches = []
+                    searchMatchIndex = -1
+                    appliedSearchText = query
+                    appliedIsRegex = parent.isRegex
+                    return
+                }
+                matches = regex.matches(in: text, range: NSRange(location: 0, length: nsString.length)).map { $0.range }
+            } else {
+                var range = NSRange(location: 0, length: nsString.length)
+                while range.location < nsString.length {
+                    let found = nsString.range(of: query, options: .caseInsensitive, range: range)
+                    guard found.location != NSNotFound else { break }
+                    matches.append(found)
+                    range.location = found.location + found.length
+                    range.length = nsString.length - range.location
+                }
             }
             searchMatches = matches
 
             let revision = parent.searchRevision
 
-            if query != appliedSearchText {
+            if query != appliedSearchText || parent.isRegex != appliedIsRegex {
                 searchMatchIndex = matches.isEmpty ? -1 : 0
                 appliedSearchText = query
+                appliedIsRegex = parent.isRegex
                 appliedSearchRevision = revision
             } else if revision != appliedSearchRevision {
                 if !matches.isEmpty {
@@ -168,9 +190,77 @@ struct EditorView: NSViewRepresentable {
                 layoutManager.addTemporaryAttribute(.backgroundColor, value: color, forCharacterRange: match)
             }
 
-            // Scroll to current match
             if searchMatchIndex >= 0 && searchMatchIndex < matches.count {
                 textView.scrollRangeToVisible(matches[searchMatchIndex])
+            }
+        }
+
+        // MARK: - Replace
+
+        private var appliedReplaceRevision = 0
+        private var appliedReplaceAllRevision = 0
+
+        func handleReplaceIfNeeded(in textView: NSTextView) {
+            let rev = parent.replaceRevision
+            if rev != appliedReplaceRevision {
+                appliedReplaceRevision = rev
+                replaceCurrent(in: textView)
+            }
+
+            let allRev = parent.replaceAllRevision
+            if allRev != appliedReplaceAllRevision {
+                appliedReplaceAllRevision = allRev
+                replaceAllMatches(in: textView)
+            }
+        }
+
+        private func replaceCurrent(in textView: NSTextView) {
+            guard searchMatchIndex >= 0, searchMatchIndex < searchMatches.count,
+                  let textStorage = textView.textStorage else { return }
+            let match = searchMatches[searchMatchIndex]
+            var replacement = parent.replaceText
+
+            if parent.isRegex,
+               let regex = try? NSRegularExpression(pattern: parent.searchText, options: .caseInsensitive),
+               let result = regex.firstMatch(in: textStorage.string, range: match) {
+                replacement = regex.replacementString(for: result, in: textStorage.string, offset: 0, template: parent.replaceText)
+            }
+
+            if textView.shouldChangeText(in: match, replacementString: replacement) {
+                textStorage.replaceCharacters(in: match, with: replacement)
+                textView.didChangeText()
+            }
+        }
+
+        private func replaceAllMatches(in textView: NSTextView) {
+            guard !searchMatches.isEmpty, let textStorage = textView.textStorage else { return }
+            let originalText = textStorage.string
+            let replacement = parent.replaceText
+
+            var replacements: [(NSRange, String)] = []
+
+            if parent.isRegex,
+               let regex = try? NSRegularExpression(pattern: parent.searchText, options: .caseInsensitive) {
+                for match in searchMatches {
+                    if let result = regex.firstMatch(in: originalText, range: match) {
+                        let expanded = regex.replacementString(for: result, in: originalText, offset: 0, template: replacement)
+                        replacements.append((match, expanded))
+                    }
+                }
+            } else {
+                replacements = searchMatches.map { ($0, replacement) }
+            }
+
+            var newText = originalText
+            for (range, text) in replacements.reversed() {
+                guard let swiftRange = Range(range, in: newText) else { continue }
+                newText.replaceSubrange(swiftRange, with: text)
+            }
+
+            let fullRange = NSRange(location: 0, length: textStorage.length)
+            if textView.shouldChangeText(in: fullRange, replacementString: newText) {
+                textStorage.replaceCharacters(in: fullRange, with: newText)
+                textView.didChangeText()
             }
         }
     }

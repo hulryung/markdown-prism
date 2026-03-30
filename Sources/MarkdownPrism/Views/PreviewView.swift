@@ -6,6 +6,7 @@ struct PreviewView: NSViewRepresentable {
     let zoomScale: Double
     let searchText: String
     let searchRevision: Int
+    let isRegex: Bool
     var fileURL: URL?
     var onOpenFile: ((URL) -> Void)?
     var onSearchResults: ((Int, Int) -> Void)?
@@ -26,6 +27,7 @@ struct PreviewView: NSViewRepresentable {
         context.coordinator.currentZoomScale = zoomScale
         context.coordinator.pendingSearchText = searchText
         context.coordinator.pendingSearchRevision = searchRevision
+        context.coordinator.pendingIsRegex = isRegex
         context.coordinator.fileURL = fileURL
         context.coordinator.onOpenFile = onOpenFile
         context.coordinator.onSearchResults = onSearchResults
@@ -59,6 +61,7 @@ struct PreviewView: NSViewRepresentable {
         c.currentZoomScale = zoomScale
         c.pendingSearchText = searchText
         c.pendingSearchRevision = searchRevision
+        c.pendingIsRegex = isRegex
         c.fileURL = fileURL
         c.onOpenFile = onOpenFile
         c.onSearchResults = onSearchResults
@@ -75,8 +78,10 @@ struct PreviewView: NSViewRepresentable {
         var currentZoomScale = ZoomState.defaultScale
         var pendingSearchText = ""
         var pendingSearchRevision = 0
+        var pendingIsRegex = false
         private var appliedSearchText: String?
         private var appliedSearchRevision = 0
+        private var appliedIsRegex = false
         var fileURL: URL?
         var onOpenFile: ((URL) -> Void)?
         var onSearchResults: ((Int, Int) -> Void)?
@@ -143,9 +148,10 @@ struct PreviewView: NSViewRepresentable {
         private func searchIfNeeded() {
             guard let webView else { return }
 
-            if pendingSearchText != appliedSearchText {
+            if pendingSearchText != appliedSearchText || pendingIsRegex != appliedIsRegex {
                 appliedSearchText = pendingSearchText
                 appliedSearchRevision = pendingSearchRevision
+                appliedIsRegex = pendingIsRegex
 
                 if pendingSearchText.isEmpty {
                     webView.evaluateJavaScript("window.clearFindHighlights();") { _, _ in }
@@ -153,7 +159,8 @@ struct PreviewView: NSViewRepresentable {
                 } else {
                     guard let encoded = try? JSONEncoder().encode(pendingSearchText),
                           let jsonString = String(data: encoded, encoding: .utf8) else { return }
-                    webView.evaluateJavaScript("window.findInPreview(\(jsonString));") { [weak self] result, _ in
+                    let regexFlag = pendingIsRegex ? "true" : "false"
+                    webView.evaluateJavaScript("window.findInPreview(\(jsonString), \(regexFlag));") { [weak self] result, _ in
                         self?.handleSearchResult(result)
                     }
                 }
