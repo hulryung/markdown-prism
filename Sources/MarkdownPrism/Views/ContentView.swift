@@ -12,17 +12,43 @@ struct ContentView: View {
     @State private var debounceWork: DispatchWorkItem?
     @State private var isModified = false
     @State private var ignoreNextTextChange = false
+    @State private var isSearchVisible = false
+    @State private var searchText = ""
+    @State private var searchMatchCount = 0
+    @State private var searchCurrentMatch = 0
+    @State private var searchRevision = 0
+    @State private var findBarFocusTrigger = 0
 
     var body: some View {
-        HSplitView {
-            if showEditor {
-                EditorView(text: $markdownText, fontSize: zoomState.editorFontSize)
-                    .frame(minWidth: 300)
+        innerBody
+            .focusedSceneValue(\.zoomInAction, zoomState.canZoomIn ? { zoomIn() } : nil)
+            .focusedSceneValue(\.zoomOutAction, zoomState.canZoomOut ? { zoomOut() } : nil)
+            .focusedSceneValue(\.resetZoomAction, zoomState.zoomScale == ZoomState.defaultScale ? nil : { resetZoom() })
+            .focusedSceneValue(\.findAction, { showSearch() })
+            .focusedSceneValue(\.findNextAction, isSearchVisible ? { findNext() } : nil)
+            .focusedSceneValue(\.findPreviousAction, isSearchVisible ? { findPrevious() } : nil)
+        .focusedSceneValue(\.dismissFindAction, isSearchVisible ? { dismissSearch() } : nil)
+    }
+
+    private var innerBody: some View {
+        VStack(spacing: 0) {
+            if isSearchVisible {
+                FindBarView(
+                    searchText: $searchText,
+                    matchCount: searchMatchCount,
+                    currentMatch: searchCurrentMatch,
+                    focusTrigger: findBarFocusTrigger,
+                    onNext: findNext,
+                    onPrevious: findPrevious,
+                    onDismiss: dismissSearch
+                )
             }
-            PreviewView(markdown: previewText, zoomScale: zoomState.zoomScale, fileURL: fileURL, onOpenFile: { url in
-                    loadFile(url)
-                })
-                .frame(minWidth: 300)
+            HSplitView {
+                if showEditor {
+                    editorPane
+                }
+                previewPane
+            }
         }
         .frame(minWidth: 900, minHeight: 600)
         .toolbar {
@@ -101,9 +127,6 @@ struct ContentView: View {
         .focusedSceneValue(\.openFileAction, { openFile() })
         .focusedSceneValue(\.saveFileAction, isModified ? { _ = saveFile() } : nil)
         .focusedSceneValue(\.saveAsFileAction, { _ = saveAsFile() })
-        .focusedSceneValue(\.zoomInAction, zoomState.canZoomIn ? { zoomIn() } : nil)
-        .focusedSceneValue(\.zoomOutAction, zoomState.canZoomOut ? { zoomOut() } : nil)
-        .focusedSceneValue(\.resetZoomAction, zoomState.zoomScale == ZoomState.defaultScale ? nil : { resetZoom() })
     }
 
     private var windowTitle: String {
@@ -115,6 +138,31 @@ struct ContentView: View {
 
     private var zoomState: ZoomState {
         ZoomState(zoomScale: zoomScale)
+    }
+
+    private var activeSearchText: String {
+        isSearchVisible ? searchText : ""
+    }
+
+    private var editorPane: some View {
+        EditorView(text: $markdownText, fontSize: zoomState.editorFontSize, searchText: activeSearchText, searchRevision: searchRevision, onEscapePressed: isSearchVisible ? dismissSearch : nil)
+            .frame(minWidth: 300)
+    }
+
+    private var previewPane: some View {
+        PreviewView(
+            markdown: previewText,
+            zoomScale: zoomState.zoomScale,
+            searchText: activeSearchText,
+            searchRevision: searchRevision,
+            fileURL: fileURL,
+            onOpenFile: { url in loadFile(url) },
+            onSearchResults: { count, current in
+                searchMatchCount = count
+                searchCurrentMatch = current
+            }
+        )
+        .frame(minWidth: 300)
     }
 
     private func setDocumentText(_ text: String, modified: Bool) {
@@ -140,6 +188,26 @@ struct ContentView: View {
         var nextZoomState = zoomState
         nextZoomState.reset()
         zoomScale = nextZoomState.zoomScale
+    }
+
+    private func showSearch() {
+        isSearchVisible = true
+        findBarFocusTrigger += 1
+    }
+
+    private func dismissSearch() {
+        isSearchVisible = false
+        searchText = ""
+        searchMatchCount = 0
+        searchCurrentMatch = 0
+    }
+
+    private func findNext() {
+        searchRevision += 1
+    }
+
+    private func findPrevious() {
+        searchRevision -= 1
     }
 
     private func schedulePreviewUpdate(_ text: String) {
@@ -458,6 +526,22 @@ private struct ResetZoomActionKey: FocusedValueKey {
     typealias Value = () -> Void
 }
 
+private struct FindActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
+private struct FindNextActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
+private struct FindPreviousActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
+private struct DismissFindActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
 extension FocusedValues {
     var newFileAction: (() -> Void)? {
         get { self[NewFileActionKey.self] }
@@ -492,5 +576,25 @@ extension FocusedValues {
     var resetZoomAction: (() -> Void)? {
         get { self[ResetZoomActionKey.self] }
         set { self[ResetZoomActionKey.self] = newValue }
+    }
+
+    var findAction: (() -> Void)? {
+        get { self[FindActionKey.self] }
+        set { self[FindActionKey.self] = newValue }
+    }
+
+    var findNextAction: (() -> Void)? {
+        get { self[FindNextActionKey.self] }
+        set { self[FindNextActionKey.self] = newValue }
+    }
+
+    var findPreviousAction: (() -> Void)? {
+        get { self[FindPreviousActionKey.self] }
+        set { self[FindPreviousActionKey.self] = newValue }
+    }
+
+    var dismissFindAction: (() -> Void)? {
+        get { self[DismissFindActionKey.self] }
+        set { self[DismissFindActionKey.self] = newValue }
     }
 }

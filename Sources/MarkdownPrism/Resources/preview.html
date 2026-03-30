@@ -115,6 +115,89 @@
       window.renderMarkdown = renderMarkdown;
       renderMarkdown('');
 
+      // --- Find in preview ---
+      var _findMatches = [];
+      var _findCurrentIndex = -1;
+
+      function clearFindHighlights() {
+        var marks = document.querySelectorAll('mark.search-highlight');
+        for (var i = 0; i < marks.length; i++) {
+          var parent = marks[i].parentNode;
+          parent.replaceChild(document.createTextNode(marks[i].textContent), marks[i]);
+          parent.normalize();
+        }
+        _findMatches = [];
+        _findCurrentIndex = -1;
+      }
+
+      function findInPreview(query) {
+        clearFindHighlights();
+        if (!query) return { count: 0, current: 0 };
+
+        var content = document.getElementById('content');
+        var walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, null);
+        var textNodes = [];
+        while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+        var queryLower = query.toLowerCase();
+
+        for (var n = 0; n < textNodes.length; n++) {
+          var node = textNodes[n];
+          var text = node.textContent;
+          var lower = text.toLowerCase();
+          var idx = lower.indexOf(queryLower);
+          if (idx === -1) continue;
+
+          var frag = document.createDocumentFragment();
+          var last = 0;
+
+          while (idx !== -1) {
+            if (idx > last) frag.appendChild(document.createTextNode(text.substring(last, idx)));
+            var mark = document.createElement('mark');
+            mark.className = 'search-highlight';
+            mark.textContent = text.substring(idx, idx + query.length);
+            frag.appendChild(mark);
+            last = idx + query.length;
+            idx = lower.indexOf(queryLower, last);
+          }
+
+          if (last < text.length) frag.appendChild(document.createTextNode(text.substring(last)));
+          node.parentNode.replaceChild(frag, node);
+        }
+
+        _findMatches = Array.from(document.querySelectorAll('mark.search-highlight'));
+        _findCurrentIndex = -1;
+
+        if (_findMatches.length > 0) return scrollToFindMatch(0);
+        return { count: 0, current: 0 };
+      }
+
+      function scrollToFindMatch(index) {
+        if (_findMatches.length === 0) return { count: 0, current: 0 };
+        if (_findCurrentIndex >= 0 && _findCurrentIndex < _findMatches.length) {
+          _findMatches[_findCurrentIndex].classList.remove('search-highlight-current');
+        }
+        _findCurrentIndex = index;
+        _findMatches[_findCurrentIndex].classList.add('search-highlight-current');
+        _findMatches[_findCurrentIndex].scrollIntoView({ block: 'center', behavior: 'smooth' });
+        return { count: _findMatches.length, current: _findCurrentIndex + 1 };
+      }
+
+      function findNextMatch() {
+        if (_findMatches.length === 0) return { count: 0, current: 0 };
+        return scrollToFindMatch((_findCurrentIndex + 1) % _findMatches.length);
+      }
+
+      function findPreviousMatch() {
+        if (_findMatches.length === 0) return { count: 0, current: 0 };
+        return scrollToFindMatch((_findCurrentIndex - 1 + _findMatches.length) % _findMatches.length);
+      }
+
+      window.findInPreview = findInPreview;
+      window.findNextMatch = findNextMatch;
+      window.findPreviousMatch = findPreviousMatch;
+      window.clearFindHighlights = clearFindHighlights;
+
       // Intercept link clicks and delegate to native app
       document.addEventListener('click', function (e) {
         var target = e.target;

@@ -61,6 +61,10 @@ struct FileCommands: Commands {
     @FocusedValue(\.zoomInAction) var zoomInAction
     @FocusedValue(\.zoomOutAction) var zoomOutAction
     @FocusedValue(\.resetZoomAction) var resetZoomAction
+    @FocusedValue(\.findAction) var findAction
+    @FocusedValue(\.findNextAction) var findNextAction
+    @FocusedValue(\.findPreviousAction) var findPreviousAction
+    @FocusedValue(\.dismissFindAction) var dismissFindAction
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -106,6 +110,31 @@ struct FileCommands: Commands {
             }
             .keyboardShortcut("0", modifiers: .command)
             .disabled(resetZoomAction == nil)
+        }
+
+        CommandGroup(after: .textEditing) {
+            Button("Find…") {
+                findAction?()
+            }
+            .keyboardShortcut("f", modifiers: .command)
+
+            Button("Find Next") {
+                findNextAction?()
+            }
+            .keyboardShortcut("g", modifiers: .command)
+            .disabled(findNextAction == nil)
+
+            Button("Find Previous") {
+                findPreviousAction?()
+            }
+            .keyboardShortcut("g", modifiers: [.command, .shift])
+            .disabled(findPreviousAction == nil)
+
+            Button("Dismiss Find") {
+                dismissFindAction?()
+            }
+            .keyboardShortcut(.escape, modifiers: [])
+            .disabled(dismissFindAction == nil)
         }
     }
 }

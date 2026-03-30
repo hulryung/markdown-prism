@@ -313,3 +313,25 @@ img {
         background-color: rgba(88, 166, 255, 0.3);
     }
 }
+
+/* Search highlights */
+mark.search-highlight {
+    background-color: rgba(255, 230, 0, 0.35);
+    border-radius: 2px;
+    padding: 1px 0;
+    color: inherit;
+}
+
+mark.search-highlight.search-highlight-current {
+    background-color: rgba(255, 150, 0, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+    mark.search-highlight {
+        background-color: rgba(255, 230, 0, 0.25);
+    }
+
+    mark.search-highlight.search-highlight-current {
+        background-color: rgba(255, 150, 0, 0.45);
+    }
+}

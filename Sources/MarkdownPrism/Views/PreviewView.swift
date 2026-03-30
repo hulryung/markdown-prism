@@ -4,8 +4,11 @@ import WebKit
 struct PreviewView: NSViewRepresentable {
     let markdown: String
     let zoomScale: Double
+    let searchText: String
+    let searchRevision: Int
     var fileURL: URL?
     var onOpenFile: ((URL) -> Void)?
+    var onSearchResults: ((Int, Int) -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -21,8 +24,11 @@ struct PreviewView: NSViewRepresentable {
         webView.navigationDelegate = context.coordinator
         context.coordinator.webView = webView
         context.coordinator.currentZoomScale = zoomScale
+        context.coordinator.pendingSearchText = searchText
+        context.coordinator.pendingSearchRevision = searchRevision
         context.coordinator.fileURL = fileURL
         context.coordinator.onOpenFile = onOpenFile
+        context.coordinator.onSearchResults = onSearchResults
 
         let templateURL: URL? = {
             #if SWIFT_PACKAGE
@@ -48,13 +54,16 @@ struct PreviewView: NSViewRepresentable {
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
-        context.coordinator.currentMarkdown = markdown
-        context.coordinator.currentZoomScale = zoomScale
-        context.coordinator.fileURL = fileURL
-        context.coordinator.onOpenFile = onOpenFile
-        if context.coordinator.isLoaded {
-            context.coordinator.applyZoomIfNeeded()
-            context.coordinator.renderCurrentMarkdownIfNeeded()
+        let c = context.coordinator
+        c.currentMarkdown = markdown
+        c.currentZoomScale = zoomScale
+        c.pendingSearchText = searchText
+        c.pendingSearchRevision = searchRevision
+        c.fileURL = fileURL
+        c.onOpenFile = onOpenFile
+        c.onSearchResults = onSearchResults
+        if c.isLoaded {
+            c.sync()
         }
     }
 
@@ -64,13 +73,19 @@ struct PreviewView: NSViewRepresentable {
         var currentMarkdown = ""
         var renderedMarkdown = ""
         var currentZoomScale = ZoomState.defaultScale
+        var pendingSearchText = ""
+        var pendingSearchRevision = 0
+        private var appliedSearchText: String?
+        private var appliedSearchRevision = 0
         var fileURL: URL?
         var onOpenFile: ((URL) -> Void)?
+        var onSearchResults: ((Int, Int) -> Void)?
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             isLoaded = true
-            applyZoomIfNeeded()
-            renderCurrentMarkdownIfNeeded(force: true)
+            renderedMarkdown = ""
+            appliedSearchText = nil
+            sync()
         }
 
         func webView(
@@ -96,42 +111,69 @@ struct PreviewView: NSViewRepresentable {
             handleLinkClick(href: href)
         }
 
-        func applyZoomIfNeeded() {
-            guard let webView else {
-                return
-            }
+        func sync() {
+            guard isLoaded else { return }
+            applyZoomIfNeeded()
+            let didRender = renderIfNeeded()
+            if didRender { appliedSearchText = nil }
+            searchIfNeeded()
+        }
 
+        private func applyZoomIfNeeded() {
+            guard let webView else { return }
             if webView.pageZoom != currentZoomScale {
                 webView.pageZoom = currentZoomScale
             }
         }
 
-        func renderCurrentMarkdownIfNeeded(force: Bool = false) {
-            guard let webView, isLoaded else {
-                return
-            }
-
-            guard force || renderedMarkdown != currentMarkdown else {
-                return
-            }
+        private func renderIfNeeded() -> Bool {
+            guard let webView else { return false }
+            guard renderedMarkdown != currentMarkdown else { return false }
 
             guard let encoded = try? JSONEncoder().encode(currentMarkdown),
-                  let jsonString = String(data: encoded, encoding: .utf8)
-            else {
-                return
-            }
+                  let jsonString = String(data: encoded, encoding: .utf8) else { return false }
 
-            let script = "window.renderMarkdown(\(jsonString));"
-            webView.evaluateJavaScript(script) { _, error in
-                if let error {
-                    print("render error: \(error.localizedDescription)")
-                }
+            webView.evaluateJavaScript("window.renderMarkdown(\(jsonString));") { _, error in
+                if let error { print("render error: \(error.localizedDescription)") }
             }
             renderedMarkdown = currentMarkdown
+            return true
+        }
+
+        private func searchIfNeeded() {
+            guard let webView else { return }
+
+            if pendingSearchText != appliedSearchText {
+                appliedSearchText = pendingSearchText
+                appliedSearchRevision = pendingSearchRevision
+
+                if pendingSearchText.isEmpty {
+                    webView.evaluateJavaScript("window.clearFindHighlights();") { _, _ in }
+                    onSearchResults?(0, 0)
+                } else {
+                    guard let encoded = try? JSONEncoder().encode(pendingSearchText),
+                          let jsonString = String(data: encoded, encoding: .utf8) else { return }
+                    webView.evaluateJavaScript("window.findInPreview(\(jsonString));") { [weak self] result, _ in
+                        self?.handleSearchResult(result)
+                    }
+                }
+            } else if pendingSearchRevision != appliedSearchRevision {
+                let fn = pendingSearchRevision > appliedSearchRevision ? "findNextMatch" : "findPreviousMatch"
+                appliedSearchRevision = pendingSearchRevision
+                webView.evaluateJavaScript("window.\(fn)();") { [weak self] result, _ in
+                    self?.handleSearchResult(result)
+                }
+            }
+        }
+
+        private func handleSearchResult(_ result: Any?) {
+            guard let dict = result as? [String: Any],
+                  let count = dict["count"] as? Int,
+                  let current = dict["current"] as? Int else { return }
+            DispatchQueue.main.async { self.onSearchResults?(count, current) }
         }
 
         private func handleLinkClick(href: String) {
-            // External URLs - open in default browser
             if href.hasPrefix("http://") || href.hasPrefix("https://") {
                 if let url = URL(string: href) {
                     NSWorkspace.shared.open(url)
@@ -139,7 +181,6 @@ struct PreviewView: NSViewRepresentable {
                 return
             }
 
-            // Mailto links
             if href.hasPrefix("mailto:") {
                 if let url = URL(string: href) {
                     NSWorkspace.shared.open(url)
@@ -147,7 +188,6 @@ struct PreviewView: NSViewRepresentable {
                 return
             }
 
-            // Relative .md / .markdown links - resolve against current file
             let ext = (href as NSString).pathExtension.lowercased()
             if ext == "md" || ext == "markdown" {
                 guard let fileURL else { return }
@@ -161,7 +201,6 @@ struct PreviewView: NSViewRepresentable {
                 return
             }
 
-            // Other URLs - try to open externally
             if let url = URL(string: href) {
                 NSWorkspace.shared.open(url)
             }
