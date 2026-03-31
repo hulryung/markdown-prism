@@ -21,6 +21,8 @@
   <script src="vendor/markdown-it-task-lists.min.js"></script>
   <!-- markdown-it-emoji (was: https://cdn.jsdelivr.net/npm/markdown-it-emoji@3.0.0/dist/markdown-it-emoji.min.js) -->
   <script src="vendor/markdown-it-emoji.min.js"></script>
+  <!-- DOMPurify (was: https://cdn.jsdelivr.net/npm/dompurify@3.3.3/dist/purify.min.js) -->
+  <script src="vendor/purify.min.js"></script>
   <!-- Mermaid UMD (was: https://cdn.jsdelivr.net/npm/mermaid@11.12.0/+esm via ES module import) -->
   <script src="vendor/mermaid.min.js"></script>
   <script>
@@ -41,7 +43,7 @@
       });
 
       var md = window.markdownit({
-        html: false,
+        html: true,
         linkify: true,
         typographer: true,
         breaks: false,
@@ -105,7 +107,13 @@
       }
 
       function renderMarkdown(markdown) {
-        var html = md.render(markdown || '');
+        var raw = md.render(markdown || '');
+        var html = window.DOMPurify ? DOMPurify.sanitize(raw, {
+          ADD_TAGS: ['details', 'summary'],
+          ADD_ATTR: ['open'],
+          FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form'],
+          FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover']
+        }) : raw;
         var content = document.getElementById('content');
         content.innerHTML = html;
         renderMath();
