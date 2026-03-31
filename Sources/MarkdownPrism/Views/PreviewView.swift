@@ -7,6 +7,7 @@ struct PreviewView: NSViewRepresentable {
     let searchText: String
     let searchRevision: Int
     let isRegex: Bool
+    let useFullWidth: Bool
     var fileURL: URL?
     var onOpenFile: ((URL) -> Void)?
     var onSearchResults: ((Int, Int) -> Void)?
@@ -28,6 +29,7 @@ struct PreviewView: NSViewRepresentable {
         context.coordinator.pendingSearchText = searchText
         context.coordinator.pendingSearchRevision = searchRevision
         context.coordinator.pendingIsRegex = isRegex
+        context.coordinator.pendingFullWidth = useFullWidth
         context.coordinator.fileURL = fileURL
         context.coordinator.onOpenFile = onOpenFile
         context.coordinator.onSearchResults = onSearchResults
@@ -62,6 +64,7 @@ struct PreviewView: NSViewRepresentable {
         c.pendingSearchText = searchText
         c.pendingSearchRevision = searchRevision
         c.pendingIsRegex = isRegex
+        c.pendingFullWidth = useFullWidth
         c.fileURL = fileURL
         c.onOpenFile = onOpenFile
         c.onSearchResults = onSearchResults
@@ -79,6 +82,8 @@ struct PreviewView: NSViewRepresentable {
         var pendingSearchText = ""
         var pendingSearchRevision = 0
         var pendingIsRegex = false
+        var pendingFullWidth = false
+        private var appliedFullWidth: Bool?
         private var appliedSearchText: String?
         private var appliedSearchRevision = 0
         private var appliedIsRegex = false
@@ -119,9 +124,17 @@ struct PreviewView: NSViewRepresentable {
         func sync() {
             guard isLoaded else { return }
             applyZoomIfNeeded()
+            applyFullWidthIfNeeded()
             let didRender = renderIfNeeded()
             if didRender { appliedSearchText = nil }
             searchIfNeeded()
+        }
+
+        private func applyFullWidthIfNeeded() {
+            guard let webView else { return }
+            guard pendingFullWidth != appliedFullWidth else { return }
+            appliedFullWidth = pendingFullWidth
+            webView.evaluateJavaScript("window.setFullWidth(\(pendingFullWidth));") { _, _ in }
         }
 
         private func applyZoomIfNeeded() {

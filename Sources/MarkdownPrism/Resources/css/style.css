@@ -63,9 +63,13 @@ body {
 }
 
 #content {
-    max-width: 880px;
+    max-width: 1012px;
     margin: 0 auto;
     padding: 32px 24px;
+}
+
+#content.full-width {
+    max-width: none;
 }
 
 /* Headings */
@@ -254,6 +258,25 @@ table {
     width: max-content;
     max-width: 100%;
     overflow: auto;
+    font-variant: tabular-nums;
+}
+
+table::-webkit-scrollbar {
+    height: 8px;
+}
+
+table::-webkit-scrollbar-track {
+    background: var(--color-bg-secondary);
+    border-radius: 4px;
+}
+
+table::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 4px;
+}
+
+table::-webkit-scrollbar-thumb:hover {
+    background: var(--color-fg-muted);
 }
 
 table th {

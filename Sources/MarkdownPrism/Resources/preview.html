@@ -213,6 +213,16 @@
         return scrollToFindMatch((_findCurrentIndex - 1 + _findMatches.length) % _findMatches.length);
       }
 
+      // --- Content width toggle ---
+      window.setFullWidth = function(enabled) {
+        var content = document.getElementById('content');
+        if (enabled) {
+          content.classList.add('full-width');
+        } else {
+          content.classList.remove('full-width');
+        }
+      };
+
       window.findInPreview = findInPreview;
       window.findNextMatch = findNextMatch;
       window.findPreviousMatch = findPreviousMatch;

@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @EnvironmentObject private var openFileState: OpenFileState
     @AppStorage("zoomScale") private var zoomScale = ZoomState.defaultScale
+    @AppStorage("useFullWidth") private var useFullWidth = false
     @State private var markdownText = ContentView.welcomeMarkdown
     @State private var previewText = ContentView.welcomeMarkdown
     @State private var fileURL: URL?
@@ -96,6 +97,14 @@ struct ContentView: View {
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(fileURL == nil)
             }
+            ToolbarItem(placement: .automatic) {
+                Button(action: { useFullWidth.toggle() }) {
+                    Label(
+                        useFullWidth ? "Fixed Width" : "Full Width",
+                        systemImage: useFullWidth ? "arrow.right.and.line.vertical.and.arrow.left" : "arrow.left.and.line.vertical.and.arrow.right"
+                    )
+                }
+            }
             ToolbarItemGroup(placement: .automatic) {
                 Button(action: zoomOut) {
                     Label("Zoom Out", systemImage: "minus.magnifyingglass")
@@ -185,6 +194,7 @@ struct ContentView: View {
             searchText: activeSearchText,
             searchRevision: searchRevision,
             isRegex: isRegex,
+            useFullWidth: useFullWidth,
             fileURL: fileURL,
             onOpenFile: { url in loadFile(url) },
             onSearchResults: { count, current in
