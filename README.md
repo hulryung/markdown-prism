@@ -41,6 +41,29 @@ Download the latest `MarkdownPrism-x.x.x.dmg` from [Releases](../../releases), o
 
 The app is signed and notarized with Apple Developer ID.
 
+### Troubleshooting: Homebrew Install/Upgrade Failure
+
+If `brew install` or `brew upgrade` fails with:
+
+```
+Error: It seems the App source '.../Markdown Prism.app' is not there.
+```
+
+This is a name mismatch issue between the cask definition and the DMG. To fix:
+
+```bash
+# 1. Remove the broken state
+brew uninstall --cask markdown-prism --force
+
+# 2. Re-fetch the latest cask definition
+brew tap hulryung/tap --force
+
+# 3. Reinstall
+brew install --cask hulryung/tap/markdown-prism
+```
+
+If the issue persists, install manually from the [Releases](../../releases) page.
+
 ## Build from Source
 
 Requires macOS 14+ and Xcode 15+.
