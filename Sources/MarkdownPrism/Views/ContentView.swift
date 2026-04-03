@@ -449,6 +449,15 @@ extension ContentView {
 
     ---
 
+    ## Table of Contents
+
+    - [Features](#features)
+    - [Text Formatting](#text-formatting)
+    - [Links & Images](#links--images)
+    - [Code Blocks](#code-blocks)
+    - [Math (KaTeX)](#math-katex)
+    - [Mermaid Diagrams](#mermaid-diagrams)
+
     ## Features
 
     ### Text Formatting

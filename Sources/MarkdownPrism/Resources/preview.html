@@ -42,6 +42,41 @@
         });
       });
 
+      // GitHub-style heading slug generator
+      function githubSlug(text) {
+        return text
+          .toLowerCase()
+          .replace(/<[^>]*>/g, '')
+          .replace(/[^\p{L}\p{N}\s-]/gu, '')
+          .replace(/\s+/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-|-$/g, '');
+      }
+
+      function markdownitHeadingAnchor(md) {
+        md.core.ruler.push('heading_anchor', function (state) {
+          var slugCounts = {};
+          var tokens = state.tokens;
+          for (var i = 0; i < tokens.length; i++) {
+            if (tokens[i].type !== 'heading_open') continue;
+            var inline = tokens[i + 1];
+            if (!inline || inline.type !== 'inline') continue;
+
+            var slug = githubSlug(inline.content);
+            if (!slug) continue;
+
+            if (slugCounts[slug] !== undefined) {
+              slugCounts[slug]++;
+              slug = slug + '-' + slugCounts[slug];
+            } else {
+              slugCounts[slug] = 0;
+            }
+
+            tokens[i].attrSet('id', slug);
+          }
+        });
+      }
+
       var md = window.markdownit({
         html: true,
         linkify: true,
@@ -57,6 +92,8 @@
           return '';
         }
       });
+
+      md.use(markdownitHeadingAnchor);
 
       if (window.markdownitTaskLists) {
         md.use(window.markdownitTaskLists, { enabled: false, label: true, labelAfter: true });
@@ -110,7 +147,7 @@
         var raw = md.render(markdown || '');
         var html = window.DOMPurify ? DOMPurify.sanitize(raw, {
           ADD_TAGS: ['details', 'summary'],
-          ADD_ATTR: ['open'],
+          ADD_ATTR: ['open', 'id'],
           FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form'],
           FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover']
         }) : raw;
@@ -244,7 +281,12 @@
         }
         if (target && target.tagName === 'A') {
           var href = target.getAttribute('href');
-          if (href && href.charAt(0) !== '#') {
+          if (href && href.charAt(0) === '#') {
+            e.preventDefault();
+            var id = decodeURIComponent(href.substring(1));
+            var el = document.getElementById(id);
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          } else if (href) {
             e.preventDefault();
             e.stopPropagation();
             if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.linkClicked) {
