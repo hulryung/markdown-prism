@@ -150,6 +150,7 @@ struct ContentView: View {
         }
         .focusedSceneValue(\.newFileAction, { newFileAction() })
         .focusedSceneValue(\.openFileAction, { openFile() })
+        .focusedSceneValue(\.openRecentAction, { url in loadFile(url) })
         .focusedSceneValue(\.saveFileAction, openFileState.isModified ? { _ = saveFile() } : nil)
         .focusedSceneValue(\.saveAsFileAction, { _ = saveAsFile() })
         .focusedSceneValue(\.zoomInAction, zoomState.canZoomIn ? { zoomIn() } : nil)
@@ -374,6 +375,7 @@ struct ContentView: View {
             setDocumentText(document.text, modified: false)
             fileURL = url
             startWatchingFile(at: url, forceRestart: previousURL != url)
+            RecentDocumentsManager.shared.addURL(url)
         } catch {
             let message = "Error loading file: \(error.localizedDescription)"
             setDocumentText(message, modified: false)
@@ -554,6 +556,10 @@ private struct OpenFileActionKey: FocusedValueKey {
     typealias Value = () -> Void
 }
 
+private struct OpenRecentActionKey: FocusedValueKey {
+    typealias Value = (URL) -> Void
+}
+
 private struct SaveFileActionKey: FocusedValueKey {
     typealias Value = () -> Void
 }
@@ -603,6 +609,11 @@ extension FocusedValues {
     var openFileAction: (() -> Void)? {
         get { self[OpenFileActionKey.self] }
         set { self[OpenFileActionKey.self] = newValue }
+    }
+
+    var openRecentAction: ((URL) -> Void)? {
+        get { self[OpenRecentActionKey.self] }
+        set { self[OpenRecentActionKey.self] = newValue }
     }
 
     var saveFileAction: (() -> Void)? {

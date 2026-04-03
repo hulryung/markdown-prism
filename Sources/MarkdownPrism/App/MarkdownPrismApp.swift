@@ -98,6 +98,7 @@ struct MarkdownPrismApp: App {
 struct FileCommands: Commands {
     @FocusedValue(\.newFileAction) var newFileAction
     @FocusedValue(\.openFileAction) var openFileAction
+    @FocusedValue(\.openRecentAction) var openRecentAction
     @FocusedValue(\.saveFileAction) var saveFileAction
     @FocusedValue(\.saveAsFileAction) var saveAsFileAction
     @FocusedValue(\.zoomInAction) var zoomInAction
@@ -108,6 +109,7 @@ struct FileCommands: Commands {
     @FocusedValue(\.findPreviousAction) var findPreviousAction
     @FocusedValue(\.dismissFindAction) var dismissFindAction
     @FocusedValue(\.showReplaceAction) var showReplaceAction
+    @ObservedObject private var recentDocuments = RecentDocumentsManager.shared
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -120,6 +122,21 @@ struct FileCommands: Commands {
                 openFileAction?()
             }
             .keyboardShortcut("o", modifiers: .command)
+
+            Menu("Open Recent") {
+                ForEach(recentDocuments.recentURLs, id: \.self) { url in
+                    Button(url.lastPathComponent) {
+                        openRecentAction?(url)
+                    }
+                }
+                if !recentDocuments.recentURLs.isEmpty {
+                    Divider()
+                }
+                Button("Clear Menu") {
+                    recentDocuments.clear()
+                }
+                .disabled(recentDocuments.recentURLs.isEmpty)
+            }
         }
 
         CommandGroup(after: .newItem) {
