@@ -38,6 +38,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 window.delegate = self
             }
         }
+
+        // Prompt to set as default Markdown app on first launch
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            DefaultAppHelper.promptIfFirstLaunch()
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -90,6 +95,12 @@ struct MarkdownPrismApp: App {
         }
         .defaultSize(width: 1200, height: 800)
         .commands {
+            CommandGroup(after: .appInfo) {
+                Divider()
+                Button("Set as Default Markdown App...") {
+                    DefaultAppHelper.setAsDefault()
+                }
+            }
             FileCommands()
         }
     }
