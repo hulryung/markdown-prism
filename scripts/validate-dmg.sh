@@ -14,7 +14,10 @@ if [ ! -f "$DMG_PATH" ]; then
     exit 1
 fi
 
-MOUNT_DIR=$(hdiutil attach "$DMG_PATH" -nobrowse -readonly 2>/dev/null | tail -1 | awk -F'\t' '{print $NF}')
+# hdiutil emits multiple tab-separated rows; only the row with a /Volumes/...
+# mount point in the last column is the one we want.
+MOUNT_DIR=$(hdiutil attach "$DMG_PATH" -nobrowse -readonly 2>/dev/null \
+    | awk -F'\t' '$NF ~ /^\/Volumes\//{print $NF; exit}')
 
 if [ -z "$MOUNT_DIR" ]; then
     echo "Error: Failed to mount DMG"

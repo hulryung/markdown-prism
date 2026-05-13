@@ -27,8 +27,11 @@ fi
 # Calculate SHA256
 SHA256=$(shasum -a 256 "$DMG_PATH" | awk '{print $1}')
 
-# Mount DMG and find the .app name
-MOUNT_DIR=$(hdiutil attach "$DMG_PATH" -nobrowse -readonly 2>/dev/null | tail -1 | awk -F'\t' '{print $NF}')
+# Mount DMG and find the .app name.
+# hdiutil emits multiple tab-separated rows; only the row with a /Volumes/...
+# mount point in the last column is the one we want.
+MOUNT_DIR=$(hdiutil attach "$DMG_PATH" -nobrowse -readonly 2>/dev/null \
+    | awk -F'\t' '$NF ~ /^\/Volumes\//{print $NF; exit}')
 
 if [ -z "$MOUNT_DIR" ]; then
     echo "Error: Failed to mount DMG"
