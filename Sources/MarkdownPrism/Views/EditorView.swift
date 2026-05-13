@@ -63,7 +63,9 @@ struct EditorView: NSViewRepresentable {
 
         let fontSizeChanged = context.coordinator.appliedFontSize != fontSize
         context.coordinator.highlighter.fontSize = fontSize
-        context.coordinator.applyTypingAttributes(to: textView)
+        if fontSizeChanged {
+            context.coordinator.applyTypingAttributes(to: textView)
+        }
 
         let textChanged = textView.string != text
         if textChanged {
@@ -146,9 +148,11 @@ struct EditorView: NSViewRepresentable {
         }
 
         func applyTypingAttributes(to textView: NSTextView) {
+            // Only set the default font. Let NSTextView's typingAttributes
+            // inherit naturally from surrounding characters so typing inside
+            // styled regions (bold, headers, etc.) keeps the style instead of
+            // flashing to plain until the next debounced re-highlight.
             textView.font = highlighter.baseFont
-            textView.typingAttributes[.font] = highlighter.baseFont
-            textView.typingAttributes[.foregroundColor] = NSColor.labelColor
         }
 
         // MARK: - Search
