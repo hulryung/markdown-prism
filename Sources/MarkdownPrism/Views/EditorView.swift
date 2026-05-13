@@ -60,19 +60,29 @@ struct EditorView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
         context.coordinator.parent = self
+
+        let fontSizeChanged = context.coordinator.appliedFontSize != fontSize
         context.coordinator.highlighter.fontSize = fontSize
         context.coordinator.applyTypingAttributes(to: textView)
 
-        if textView.string != text {
+        let textChanged = textView.string != text
+        if textChanged {
             let selectedRanges = textView.selectedRanges
             textView.string = text
-            context.coordinator.highlighter.highlight(textView.textStorage!)
-            textView.selectedRanges = selectedRanges
-        } else {
-            let selectedRanges = textView.selectedRanges
-            context.coordinator.highlighter.highlight(textView.textStorage!)
             textView.selectedRanges = selectedRanges
         }
+
+        // Re-highlight only when text changed externally or font size changed.
+        // Per-keystroke highlights are debounced in textDidChange.
+        if textChanged || fontSizeChanged {
+            context.coordinator.cancelPendingHighlight()
+            if let textStorage = textView.textStorage {
+                let selectedRanges = textView.selectedRanges
+                context.coordinator.highlighter.highlight(textStorage)
+                textView.selectedRanges = selectedRanges
+            }
+        }
+        context.coordinator.appliedFontSize = fontSize
         context.coordinator.handleReplaceIfNeeded(in: textView)
         context.coordinator.updateSearchHighlights(in: textView)
     }
@@ -93,19 +103,46 @@ struct EditorView: NSViewRepresentable {
         var parent: EditorView
         weak var textView: NSTextView?
         let highlighter: MarkdownHighlighter
+        var appliedFontSize: CGFloat
+        private var highlightWork: DispatchWorkItem?
+        private static let highlightDebounceInterval: TimeInterval = 0.15
 
         init(_ parent: EditorView) {
             self.parent = parent
+            self.appliedFontSize = parent.fontSize
             highlighter = MarkdownHighlighter(fontSize: parent.fontSize)
+        }
+
+        deinit {
+            highlightWork?.cancel()
         }
 
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             parent.text = textView.string
+            scheduleHighlight(for: textView)
+        }
 
-            let selectedRanges = textView.selectedRanges
-            highlighter.highlight(textView.textStorage!)
-            textView.selectedRanges = selectedRanges
+        func cancelPendingHighlight() {
+            highlightWork?.cancel()
+            highlightWork = nil
+        }
+
+        private func scheduleHighlight(for textView: NSTextView) {
+            highlightWork?.cancel()
+            let work = DispatchWorkItem { [weak self, weak textView] in
+                guard let self,
+                      let textView,
+                      let textStorage = textView.textStorage else { return }
+                let selectedRanges = textView.selectedRanges
+                self.highlighter.highlight(textStorage)
+                textView.selectedRanges = selectedRanges
+            }
+            highlightWork = work
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + Self.highlightDebounceInterval,
+                execute: work
+            )
         }
 
         func applyTypingAttributes(to textView: NSTextView) {
