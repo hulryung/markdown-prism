@@ -5,10 +5,12 @@ class RecentDocumentsManager: ObservableObject {
 
     private let key = "recentDocuments"
     private let maxCount = 10
+    private let defaults: UserDefaults
 
     @Published var recentURLs: [URL] = []
 
-    private init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         load()
     }
 
@@ -30,11 +32,11 @@ class RecentDocumentsManager: ObservableObject {
 
     private func save() {
         let paths = recentURLs.map { $0.path }
-        UserDefaults.standard.set(paths, forKey: key)
+        defaults.set(paths, forKey: key)
     }
 
     private func load() {
-        guard let paths = UserDefaults.standard.stringArray(forKey: key) else { return }
+        guard let paths = defaults.stringArray(forKey: key) else { return }
         recentURLs = paths.compactMap { path in
             let url = URL(fileURLWithPath: path)
             return FileManager.default.fileExists(atPath: path) ? url : nil

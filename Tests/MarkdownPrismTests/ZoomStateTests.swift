@@ -36,4 +36,57 @@ final class ZoomStateTests: XCTestCase {
         XCTAssertEqual(lowZoomState.zoomScale, ZoomState.minScale, accuracy: 0.0001)
         XCTAssertEqual(highZoomState.zoomScale, ZoomState.maxScale, accuracy: 0.0001)
     }
+
+    func test_init_clampsAboveMaxScale() {
+        let zoomState = ZoomState(zoomScale: 99)
+
+        XCTAssertEqual(zoomState.zoomScale, ZoomState.maxScale, accuracy: 0.0001)
+    }
+
+    func test_init_clampsBelowMinScale() {
+        let zoomState = ZoomState(zoomScale: 0.01)
+
+        XCTAssertEqual(zoomState.zoomScale, ZoomState.minScale, accuracy: 0.0001)
+    }
+
+    func test_init_roundsToNearestTenth() {
+        XCTAssertEqual(ZoomState(zoomScale: 1.234).zoomScale, 1.2, accuracy: 0.0001)
+        XCTAssertEqual(ZoomState(zoomScale: 1.05).zoomScale, 1.1, accuracy: 0.0001)
+    }
+
+    func test_editorFontSize_scalesWithZoom() {
+        let baseFontSize = ZoomState.baseEditorFontSize
+
+        let normalZoomState = ZoomState(zoomScale: 1.0)
+        let largeZoomState = ZoomState(zoomScale: 1.5)
+
+        XCTAssertEqual(normalZoomState.editorFontSize, baseFontSize * 1.0)
+        XCTAssertEqual(largeZoomState.editorFontSize, baseFontSize * 1.5)
+    }
+
+    func test_canZoomIn_isFalseAtMaxScaleAndTrueOneStepBelow() {
+        let atMax = ZoomState(zoomScale: ZoomState.maxScale)
+        let oneStepBelowMax = ZoomState(zoomScale: ZoomState.maxScale - ZoomState.step)
+
+        XCTAssertFalse(atMax.canZoomIn)
+        XCTAssertTrue(oneStepBelowMax.canZoomIn)
+    }
+
+    func test_canZoomOut_isFalseAtMinScaleAndTrueOneStepAbove() {
+        let atMin = ZoomState(zoomScale: ZoomState.minScale)
+        let oneStepAboveMin = ZoomState(zoomScale: ZoomState.minScale + ZoomState.step)
+
+        XCTAssertFalse(atMin.canZoomOut)
+        XCTAssertTrue(oneStepAboveMin.canZoomOut)
+    }
+
+    func test_repeatedZoomIn_landsExactlyOnMaxScaleWithoutDrift() {
+        var zoomState = ZoomState(zoomScale: 1.0)
+
+        for _ in 0..<20 {
+            zoomState.zoomIn()
+        }
+
+        XCTAssertEqual(zoomState.zoomScale, ZoomState.maxScale)
+    }
 }
