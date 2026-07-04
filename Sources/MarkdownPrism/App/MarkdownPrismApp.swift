@@ -8,6 +8,7 @@ class OpenFileState: ObservableObject {
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let openFileState = OpenFileState()
+    private var delegateProxies: [ObjectIdentifier: WindowDelegateProxy] = [:]
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Ensure the app appears as a regular app with Dock icon and menu bar
@@ -32,12 +33,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
         }
 
-        // Set window delegate after SwiftUI creates the window
-        DispatchQueue.main.async {
-            for window in NSApplication.shared.windows {
-                window.delegate = self
-            }
-        }
+        // Wrap SwiftUI's window delegate with a forwarding proxy so we can
+        // intercept windowShouldClose without stealing scene lifecycle
+        // handling from SwiftUI. Windows created at any time are covered.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWindowDidBecomeKey(_:)),
+            name: NSWindow.didBecomeKeyNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWindowWillClose(_:)),
+            name: NSWindow.willCloseNotification,
+            object: nil
+        )
 
         // Prompt to set as default Markdown app on first launch
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -48,6 +58,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
         guard let url = urls.first else { return }
         openFileState.pendingURL = url
+    }
+
+    // MARK: - Window Delegate Proxying
+
+    @objc private func handleWindowDidBecomeKey(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        installProxyIfNeeded(on: window)
+    }
+
+    @objc private func handleWindowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        delegateProxies.removeValue(forKey: ObjectIdentifier(window))
+    }
+
+    private func installProxyIfNeeded(on window: NSWindow) {
+        guard window.styleMask.contains(.titled), !(window is NSPanel) else { return }
+        if window.delegate is WindowDelegateProxy { return }
+
+        let proxy = WindowDelegateProxy()
+        proxy.original = window.delegate
+        proxy.appDelegate = self
+        window.delegate = proxy
+        delegateProxies[ObjectIdentifier(window)] = proxy
     }
 
     // MARK: - NSWindowDelegate
@@ -62,7 +95,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         confirmSaveIfNeeded() ? .terminateNow : .terminateCancel
     }
 
-    private func confirmSaveIfNeeded() -> Bool {
+    fileprivate func confirmSaveIfNeeded() -> Bool {
         guard openFileState.isModified else { return true }
 
         let alert = NSAlert()
@@ -81,6 +114,28 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         default:
             return false
         }
+    }
+}
+
+final class WindowDelegateProxy: NSObject, NSWindowDelegate {
+    weak var original: NSWindowDelegate?
+    weak var appDelegate: AppDelegate?
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard appDelegate?.confirmSaveIfNeeded() ?? true else { return false }
+        if let original, original.responds(to: #selector(NSWindowDelegate.windowShouldClose(_:))) {
+            return original.windowShouldClose?(sender) ?? true
+        }
+        return true
+    }
+
+    override func responds(to aSelector: Selector!) -> Bool {
+        super.responds(to: aSelector) || (original?.responds(to: aSelector) ?? false)
+    }
+
+    override func forwardingTarget(for aSelector: Selector!) -> Any? {
+        if let original, original.responds(to: aSelector) { return original }
+        return super.forwardingTarget(for: aSelector)
     }
 }
 
