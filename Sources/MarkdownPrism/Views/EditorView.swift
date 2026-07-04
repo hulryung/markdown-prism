@@ -67,11 +67,17 @@ struct EditorView: NSViewRepresentable {
             context.coordinator.applyTypingAttributes(to: textView)
         }
 
-        let textChanged = textView.string != text
+        let textChanged: Bool
+        if context.coordinator.isEditingFromTextView {
+            textChanged = false
+        } else {
+            textChanged = textView.string != text
+        }
         if textChanged {
             let selectedRanges = textView.selectedRanges
             textView.string = text
             textView.selectedRanges = selectedRanges
+            context.coordinator.noteExternalTextChange()
         }
 
         // Re-highlight only when text changed externally or font size changed.
@@ -87,6 +93,7 @@ struct EditorView: NSViewRepresentable {
         context.coordinator.appliedFontSize = fontSize
         context.coordinator.handleReplaceIfNeeded(in: textView)
         context.coordinator.updateSearchHighlights(in: textView)
+        context.coordinator.isEditingFromTextView = false
     }
 
     final class EditorTextView: NSTextView {
@@ -108,6 +115,9 @@ struct EditorView: NSViewRepresentable {
         var appliedFontSize: CGFloat
         private var highlightWork: DispatchWorkItem?
         private static let highlightDebounceInterval: TimeInterval = 0.15
+        private var textRevision = 0
+        private var appliedTextRevision = -1
+        fileprivate var isEditingFromTextView = false
 
         init(_ parent: EditorView) {
             self.parent = parent
@@ -121,8 +131,11 @@ struct EditorView: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
+            isEditingFromTextView = true
+            textRevision += 1
+            let editedRange = textView.selectedRange()
             parent.text = textView.string
-            scheduleHighlight(for: textView)
+            scheduleHighlight(for: textView, editedRange: editedRange)
         }
 
         func cancelPendingHighlight() {
@@ -130,14 +143,18 @@ struct EditorView: NSViewRepresentable {
             highlightWork = nil
         }
 
-        private func scheduleHighlight(for textView: NSTextView) {
+        fileprivate func noteExternalTextChange() {
+            textRevision += 1
+        }
+
+        private func scheduleHighlight(for textView: NSTextView, editedRange: NSRange) {
             highlightWork?.cancel()
             let work = DispatchWorkItem { [weak self, weak textView] in
                 guard let self,
                       let textView,
                       let textStorage = textView.textStorage else { return }
                 let selectedRanges = textView.selectedRanges
-                self.highlighter.highlight(textStorage)
+                self.highlighter.highlight(textStorage, in: editedRange)
                 textView.selectedRanges = selectedRanges
             }
             highlightWork = work
@@ -167,14 +184,26 @@ struct EditorView: NSViewRepresentable {
             guard let layoutManager = textView.layoutManager,
                   let textStorage = textView.textStorage else { return }
 
+            let query = parent.searchText
+            let queryChanged = query != appliedSearchText || parent.isRegex != appliedIsRegex
+            let revisionChanged = parent.searchRevision != appliedSearchRevision
+            let textChanged = textRevision != appliedTextRevision
+
+            guard queryChanged || revisionChanged || textChanged else { return }
+
+            if query.isEmpty && appliedSearchText.isEmpty {
+                appliedTextRevision = textRevision
+                return
+            }
+
             let fullRange = NSRange(location: 0, length: textStorage.length)
             layoutManager.removeTemporaryAttribute(.backgroundColor, forCharacterRange: fullRange)
 
-            let query = parent.searchText
             guard !query.isEmpty else {
                 searchMatches = []
                 searchMatchIndex = -1
                 appliedSearchText = ""
+                appliedTextRevision = textRevision
                 return
             }
 
@@ -189,6 +218,7 @@ struct EditorView: NSViewRepresentable {
                     searchMatchIndex = -1
                     appliedSearchText = query
                     appliedIsRegex = parent.isRegex
+                    appliedTextRevision = textRevision
                     return
                 }
                 matches = regex.matches(in: text, range: NSRange(location: 0, length: nsString.length)).map { $0.range }
@@ -206,12 +236,12 @@ struct EditorView: NSViewRepresentable {
 
             let revision = parent.searchRevision
 
-            if query != appliedSearchText || parent.isRegex != appliedIsRegex {
+            if queryChanged {
                 searchMatchIndex = matches.isEmpty ? -1 : 0
                 appliedSearchText = query
                 appliedIsRegex = parent.isRegex
                 appliedSearchRevision = revision
-            } else if revision != appliedSearchRevision {
+            } else if revisionChanged {
                 if !matches.isEmpty {
                     if revision > appliedSearchRevision {
                         searchMatchIndex = (searchMatchIndex + 1) % matches.count
@@ -231,9 +261,12 @@ struct EditorView: NSViewRepresentable {
                 layoutManager.addTemporaryAttribute(.backgroundColor, value: color, forCharacterRange: match)
             }
 
-            if searchMatchIndex >= 0 && searchMatchIndex < matches.count {
+            if queryChanged || revisionChanged,
+               searchMatchIndex >= 0 && searchMatchIndex < matches.count {
                 textView.scrollRangeToVisible(matches[searchMatchIndex])
             }
+
+            appliedTextRevision = textRevision
         }
 
         // MARK: - Replace
@@ -245,13 +278,18 @@ struct EditorView: NSViewRepresentable {
             let rev = parent.replaceRevision
             if rev != appliedReplaceRevision {
                 appliedReplaceRevision = rev
-                replaceCurrent(in: textView)
+                DispatchQueue.main.async { [weak self, weak textView] in
+                    guard let self, let textView else { return }
+                    self.replaceCurrent(in: textView)
+                }
             }
-
             let allRev = parent.replaceAllRevision
             if allRev != appliedReplaceAllRevision {
                 appliedReplaceAllRevision = allRev
-                replaceAllMatches(in: textView)
+                DispatchQueue.main.async { [weak self, weak textView] in
+                    guard let self, let textView else { return }
+                    self.replaceAllMatches(in: textView)
+                }
             }
         }
 

@@ -146,7 +146,7 @@ final class MarkdownHighlighter {
 
         inlineCodePattern?.enumerateMatches(in: text, options: [], range: fullRange) { match, _, _ in
             guard let range = match?.range else { return }
-            if !excludedRanges.contains(where: { NSIntersectionRange($0, range).length > 0 }) {
+            if !Self.hasIntersectingRange(excludedRanges, with: range) {
                 excludedRanges.append(range)
                 textStorage.addAttributes([
                     .backgroundColor: NSColor.quaternaryLabelColor
@@ -154,9 +154,58 @@ final class MarkdownHighlighter {
             }
         }
 
+        excludedRanges.sort { $0.location < $1.location }
+
         // 2. Apply markdown rules only outside code blocks
         for rule in markdownRules {
             rule.pattern.enumerateMatches(in: text, options: [], range: fullRange) { match, _, _ in
+                guard let matchRange = match?.range else { return }
+                let isInsideCode = Self.hasIntersectingRange(excludedRanges, with: matchRange)
+                if !isInsideCode {
+                    textStorage.addAttributes(rule.attributes, range: matchRange)
+                }
+            }
+        }
+
+        textStorage.endEditing()
+    }
+
+    func highlight(_ textStorage: NSTextStorage, in editedRange: NSRange) {
+        let text = textStorage.string
+        let nsText = text as NSString
+
+        guard nsText.length > 0 else { return }
+
+        // Fence boundaries change global exclusion state, so any document
+        // containing a fence must go through the full re-highlight path.
+        guard !text.contains("```") else {
+            highlight(textStorage)
+            return
+        }
+
+        let clampedRange = NSIntersectionRange(editedRange, NSRange(location: 0, length: nsText.length))
+        let range = nsText.paragraphRange(for: clampedRange)
+
+        textStorage.beginEditing()
+
+        // Reset to base attributes within the edited region
+        textStorage.setAttributes([
+            .font: baseFont,
+            .foregroundColor: baseColor
+        ], range: range)
+
+        var excludedRanges: [NSRange] = []
+
+        inlineCodePattern?.enumerateMatches(in: text, options: [], range: range) { match, _, _ in
+            guard let matchRange = match?.range else { return }
+            excludedRanges.append(matchRange)
+            textStorage.addAttributes([
+                .backgroundColor: NSColor.quaternaryLabelColor
+            ], range: matchRange)
+        }
+
+        for rule in markdownRules {
+            rule.pattern.enumerateMatches(in: text, options: [], range: range) { match, _, _ in
                 guard let matchRange = match?.range else { return }
                 let isInsideCode = excludedRanges.contains { NSIntersectionRange($0, matchRange).length > 0 }
                 if !isInsideCode {
@@ -166,5 +215,25 @@ final class MarkdownHighlighter {
         }
 
         textStorage.endEditing()
+    }
+
+    private static func hasIntersectingRange(_ sortedRanges: [NSRange], with range: NSRange) -> Bool {
+        var low = 0
+        var high = sortedRanges.count - 1
+        while low <= high {
+            let mid = (low + high) / 2
+            let candidate = sortedRanges[mid]
+            if NSIntersectionRange(candidate, range).length > 0 {
+                return true
+            }
+            if candidate.location + candidate.length <= range.location {
+                low = mid + 1
+            } else if candidate.location >= range.location + range.length {
+                high = mid - 1
+            } else {
+                return true
+            }
+        }
+        return false
     }
 }
