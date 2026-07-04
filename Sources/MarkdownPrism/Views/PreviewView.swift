@@ -168,7 +168,7 @@ struct PreviewView: NSViewRepresentable {
 
                 if pendingSearchText.isEmpty {
                     webView.evaluateJavaScript("window.clearFindHighlights();") { _, _ in }
-                    onSearchResults?(0, 0)
+                    DispatchQueue.main.async { self.onSearchResults?(0, 0) }
                 } else {
                     guard let encoded = try? JSONEncoder().encode(pendingSearchText),
                           let jsonString = String(data: encoded, encoding: .utf8) else { return }
@@ -221,9 +221,7 @@ struct PreviewView: NSViewRepresentable {
                 return
             }
 
-            if let url = URL(string: href) {
-                NSWorkspace.shared.open(url)
-            }
+            print("Ignored link click with unsupported scheme: \(href)")
         }
     }
 }

@@ -34,12 +34,17 @@
         theme: prefersDark.matches ? 'dark' : 'default'
       });
 
+      var mermaidCache = new Map();
+      var lastMarkdown = '';
+
       prefersDark.addEventListener('change', function (e) {
         mermaid.initialize({
           startOnLoad: false,
           securityLevel: 'strict',
           theme: e.matches ? 'dark' : 'default'
         });
+        mermaidCache.clear();
+        renderMarkdown(lastMarkdown);
       });
 
       // GitHub-style heading slug generator
@@ -77,6 +82,8 @@
         });
       }
 
+      var autoDetectCache = new Map();
+
       var md = window.markdownit({
         html: true,
         linkify: true,
@@ -87,7 +94,17 @@
             try { return hljs.highlight(str, { language: lang }).value; } catch (_) {}
           }
           if (window.hljs) {
-            try { return hljs.highlightAuto(str).value; } catch (_) {}
+            if (autoDetectCache.has(str)) {
+              return autoDetectCache.get(str);
+            }
+            try {
+              var result = hljs.highlightAuto(str, ['javascript', 'python', 'swift', 'bash', 'json', 'html', 'css', 'typescript', 'yaml']).value;
+              if (autoDetectCache.size > 200) {
+                autoDetectCache.clear();
+              }
+              autoDetectCache.set(str, result);
+              return result;
+            } catch (_) {}
           }
           return '';
         }
@@ -105,6 +122,7 @@
 
       function renderMermaidBlocks() {
         var blocks = Array.from(document.querySelectorAll('pre code.language-mermaid'));
+        var toRender = [];
         for (var i = 0; i < blocks.length; i++) {
           var block = blocks[i];
           var src = block.textContent || '';
@@ -114,18 +132,29 @@
           }
 
           var holder = document.createElement('div');
-          holder.className = 'mermaid';
-          holder.textContent = src;
+          holder.dataset.mermaidSrc = src;
+          if (mermaidCache.has(src)) {
+            holder.innerHTML = mermaidCache.get(src);
+          } else {
+            holder.className = 'mermaid';
+            holder.textContent = src;
+            toRender.push(holder);
+          }
           parentPre.replaceWith(holder);
         }
 
-        if (blocks.length > 0) {
-          try {
-            mermaid.run({ querySelector: '.mermaid' });
-          } catch (err) {
-            console.error('Mermaid render failed:', err);
-          }
+        if (toRender.length === 0) {
+          return Promise.resolve();
         }
+
+        return mermaid.run({ querySelector: '.mermaid' }).then(function () {
+          for (var j = 0; j < toRender.length; j++) {
+            var rendered = toRender[j];
+            mermaidCache.set(rendered.dataset.mermaidSrc, rendered.innerHTML);
+          }
+        }).catch(function (err) {
+          console.error('Mermaid render failed:', err);
+        });
       }
 
       function renderMath() {
@@ -144,17 +173,28 @@
       }
 
       function renderMarkdown(markdown) {
+        lastMarkdown = markdown || '';
+
+        if (!window.DOMPurify) {
+          document.getElementById('content').textContent = markdown || '';
+          return;
+        }
+
+        var y = window.scrollY;
         var raw = md.render(markdown || '');
-        var html = window.DOMPurify ? DOMPurify.sanitize(raw, {
+        var html = DOMPurify.sanitize(raw, {
           ADD_TAGS: ['details', 'summary'],
           ADD_ATTR: ['open', 'id'],
           FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form'],
           FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover']
-        }) : raw;
+        });
         var content = document.getElementById('content');
         content.innerHTML = html;
         renderMath();
-        renderMermaidBlocks();
+        window.scrollTo(0, y);
+        renderMermaidBlocks().then(function () {
+          window.scrollTo(0, y);
+        });
       }
 
       window.renderMarkdown = renderMarkdown;
@@ -205,7 +245,10 @@
         var content = document.getElementById('content');
         var walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, null);
         var textNodes = [];
-        while (walker.nextNode()) textNodes.push(walker.currentNode);
+        while (walker.nextNode()) {
+          var nd = walker.currentNode;
+          if (!(nd.parentElement && nd.parentElement.closest('svg'))) textNodes.push(nd);
+        }
 
         for (var n = 0; n < textNodes.length; n++) {
           var node = textNodes[n];
