@@ -122,19 +122,19 @@ struct ContentView: View {
             handleDrop(providers)
         }
         .onOpenURL { url in
-            loadFile(url)
+            requestOpen(url)
         }
         .onChange(of: openFileState.pendingURL) {
             if let url = openFileState.pendingURL {
                 openFileState.pendingURL = nil
-                loadFile(url)
+                requestOpen(url)
             }
         }
         .onAppear {
             openFileState.saveHandler = { self.saveFile() }
             if let url = openFileState.pendingURL {
                 openFileState.pendingURL = nil
-                loadFile(url)
+                requestOpen(url)
             }
         }
         .onDisappear {
@@ -146,11 +146,12 @@ struct ContentView: View {
                 ignoreNextTextChange = false
                 return
             }
+            openFileState.isModified = true
             schedulePreviewUpdate(markdownText)
         }
         .focusedSceneValue(\.newFileAction, { newFileAction() })
         .focusedSceneValue(\.openFileAction, { openFile() })
-        .focusedSceneValue(\.openRecentAction, { url in loadFile(url) })
+        .focusedSceneValue(\.openRecentAction, { url in requestOpen(url) })
         .focusedSceneValue(\.saveFileAction, openFileState.isModified ? { _ = saveFile() } : nil)
         .focusedSceneValue(\.saveAsFileAction, { _ = saveAsFile() })
         .focusedSceneValue(\.zoomInAction, zoomState.canZoomIn ? { zoomIn() } : nil)
@@ -197,7 +198,7 @@ struct ContentView: View {
             isRegex: isRegex,
             useFullWidth: useFullWidth,
             fileURL: fileURL,
-            onOpenFile: { url in loadFile(url) },
+            onOpenFile: { url in requestOpen(url) },
             onSearchResults: { count, current in
                 searchMatchCount = count
                 searchCurrentMatch = current
@@ -207,7 +208,9 @@ struct ContentView: View {
     }
 
     private func setDocumentText(_ text: String, modified: Bool) {
-        ignoreNextTextChange = true
+        debounceWork?.cancel()
+        debounceWork = nil
+        ignoreNextTextChange = (markdownText != text)
         markdownText = text
         previewText = text
         openFileState.isModified = modified
@@ -263,7 +266,6 @@ struct ContentView: View {
         debounceWork?.cancel()
         let work = DispatchWorkItem {
             previewText = text
-            openFileState.isModified = true
         }
         debounceWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
@@ -334,11 +336,21 @@ struct ContentView: View {
     }
 
     private func writeFile(to url: URL) -> Bool {
+        let isWatchedURL = url == fileURL
+        if isWatchedURL {
+            fileWatcher?.stop()
+        }
         do {
             try markdownText.write(to: url, atomically: true, encoding: .utf8)
             openFileState.isModified = false
+            if isWatchedURL {
+                startWatchingFile(at: url, forceRestart: true)
+            }
             return true
         } catch {
+            if isWatchedURL {
+                startWatchingFile(at: url, forceRestart: true)
+            }
             let alert = NSAlert()
             alert.messageText = "Save Failed"
             alert.informativeText = error.localizedDescription
@@ -368,6 +380,13 @@ struct ContentView: View {
         }
     }
 
+    private func requestOpen(_ url: URL) {
+        if openFileState.isModified {
+            guard confirmDiscardChanges() else { return }
+        }
+        loadFile(url)
+    }
+
     private func loadFile(_ url: URL) {
         let previousURL = fileURL
         do {
@@ -386,7 +405,7 @@ struct ContentView: View {
         guard let fileURL else {
             return
         }
-        loadFile(fileURL)
+        requestOpen(fileURL)
     }
 
     private func startWatchingFile(at url: URL, forceRestart: Bool) {
@@ -399,6 +418,17 @@ struct ContentView: View {
             DispatchQueue.main.async {
                 guard self.fileURL == url else {
                     return
+                }
+                if self.openFileState.isModified {
+                    let alert = NSAlert()
+                    alert.messageText = "The file was changed on disk"
+                    alert.informativeText = "Reload and discard your unsaved changes?"
+                    alert.addButton(withTitle: "Reload")
+                    alert.addButton(withTitle: "Keep My Changes")
+                    alert.alertStyle = .warning
+                    guard alert.runModal() == .alertFirstButtonReturn else {
+                        return
+                    }
                 }
                 self.loadFile(url)
             }
@@ -426,12 +456,7 @@ struct ContentView: View {
             }
 
             DispatchQueue.main.async {
-                if self.openFileState.isModified {
-                    guard self.confirmDiscardChanges() else {
-                        return
-                    }
-                }
-                self.loadFile(url)
+                self.requestOpen(url)
             }
         }
 
