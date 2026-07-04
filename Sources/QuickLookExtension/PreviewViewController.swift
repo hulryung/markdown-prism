@@ -9,7 +9,6 @@ class PreviewViewController: NSViewController, QLPreviewingController, WKNavigat
 
     override func loadView() {
         let config = WKWebViewConfiguration()
-        config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
         webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = self
         self.view = webView
@@ -41,6 +40,7 @@ class PreviewViewController: NSViewController, QLPreviewingController, WKNavigat
                 markdown: markdown,
                 resourcesURL: resourcesURL
             )
+            cleanup()
             self.tempDir = dir
             self.completionHandler = handler
             webView.loadFileURL(htmlURL, allowingReadAccessTo: dir)
@@ -58,13 +58,24 @@ class PreviewViewController: NSViewController, QLPreviewingController, WKNavigat
             throw CocoaError(.coderInvalidValue)
         }
 
+        let safe = jsonString
+            .replacingOccurrences(of: "<", with: "\\u003c")
+            .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+            .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+
         // Embed markdown content directly — replace the empty initial render call
-        let modifiedHTML = templateHTML.replacingOccurrences(
+        var modifiedHTML = templateHTML.replacingOccurrences(
             of: "renderMarkdown('');",
-            with: "renderMarkdown(\(jsonString));"
+            with: "renderMarkdown(\(safe));"
         )
 
-        // Create temp directory with symlinks to bundle resources
+        let csp = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'\">"
+        modifiedHTML = modifiedHTML.replacingOccurrences(
+            of: "<meta charset=\"utf-8\">",
+            with: "<meta charset=\"utf-8\">" + csp
+        )
+
+        // Create temp directory with copies of bundle resources
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("ql-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -73,7 +84,7 @@ class PreviewViewController: NSViewController, QLPreviewingController, WKNavigat
         for subdir in ["css", "vendor"] {
             let source = resourcesURL.appendingPathComponent(subdir)
             let dest = dir.appendingPathComponent(subdir)
-            try fm.createSymbolicLink(at: dest, withDestinationURL: source)
+            try fm.copyItem(at: source, to: dest)
         }
 
         let htmlURL = dir.appendingPathComponent("preview.html")
