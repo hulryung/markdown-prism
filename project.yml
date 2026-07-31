@@ -34,8 +34,8 @@ targets:
       properties:
         CFBundleName: Markdown Prism
         CFBundleDisplayName: Markdown Prism
-        CFBundleShortVersionString: "0.4.6"
-        CFBundleVersion: "8"
+        CFBundleShortVersionString: "0.4.7"
+        CFBundleVersion: "9"
         LSMinimumSystemVersion: "14.0"
         CFBundleDocumentTypes:
           - CFBundleTypeName: Markdown Document
@@ -88,8 +88,8 @@ targets:
       path: Sources/QuickLookExtension/Info.plist
       properties:
         CFBundleDisplayName: Markdown Prism Quick Look
-        CFBundleShortVersionString: "0.4.6"
-        CFBundleVersion: "8"
+        CFBundleShortVersionString: "0.4.7"
+        CFBundleVersion: "9"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.quicklook.preview
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PreviewViewController
