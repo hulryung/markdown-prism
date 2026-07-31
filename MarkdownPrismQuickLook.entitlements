@@ -4,5 +4,11 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<!-- Required for WKWebView inside a sandboxed extension: without it the
+	     WebContent process never completes a load, so didFinish never fires and
+	     the Quick Look preview spins forever. Remote content is blocked by the
+	     Content-Security-Policy injected in PreviewViewController instead. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
 </dict>
 </plist>
