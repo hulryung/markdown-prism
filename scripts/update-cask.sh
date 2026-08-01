@@ -3,13 +3,23 @@
 # Update the Homebrew cask definition from a DMG.
 # Reads the actual app name from the DMG to prevent name mismatch issues.
 #
-# Usage: ./scripts/update-cask.sh <path-to-dmg> <version>
+# Usage: ./scripts/update-cask.sh <path-to-dmg> [version]
+#
+# The version defaults to MARKETING_VERSION in project.yml, the single source
+# of truth the Info.plists are generated from, so the cask cannot drift from
+# what was built.
 #
 
 set -euo pipefail
 
-DMG_PATH="${1:?Usage: $0 <path-to-dmg> <version>}"
-VERSION="${2:?Usage: $0 <path-to-dmg> <version>}"
+DMG_PATH="${1:?Usage: $0 <path-to-dmg> [version]}"
+PROJECT_YML="$(dirname "$0")/../project.yml"
+VERSION="${2:-$(awk -F'"' '/^ *MARKETING_VERSION:/{print $2; exit}' "$PROJECT_YML")}"
+
+if [ -z "$VERSION" ]; then
+    echo "Error: no version given and MARKETING_VERSION not found in $PROJECT_YML"
+    exit 1
+fi
 
 TAP_CASK="/opt/homebrew/Library/Taps/hulryung/homebrew-tap/Casks/markdown-prism.rb"
 

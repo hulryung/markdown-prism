@@ -10,6 +10,11 @@ settings:
   base:
     SWIFT_VERSION: "5.9"
     ENABLE_HARDENED_RUNTIME: true
+    # Single source of truth for the version. Both Info.plists are generated
+    # from this file by xcodegen and reference these as build settings, so this
+    # is the only place a release bump needs to touch.
+    MARKETING_VERSION: "0.4.7"
+    CURRENT_PROJECT_VERSION: "9"
   configs:
     Release:
       CODE_SIGN_INJECT_BASE_ENTITLEMENTS: false
@@ -34,8 +39,8 @@ targets:
       properties:
         CFBundleName: Markdown Prism
         CFBundleDisplayName: Markdown Prism
-        CFBundleShortVersionString: "0.4.7"
-        CFBundleVersion: "9"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSMinimumSystemVersion: "14.0"
         CFBundleDocumentTypes:
           - CFBundleTypeName: Markdown Document
@@ -88,8 +93,8 @@ targets:
       path: Sources/QuickLookExtension/Info.plist
       properties:
         CFBundleDisplayName: Markdown Prism Quick Look
-        CFBundleShortVersionString: "0.4.7"
-        CFBundleVersion: "9"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.quicklook.preview
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PreviewViewController
