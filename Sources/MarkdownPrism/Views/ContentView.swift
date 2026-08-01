@@ -392,7 +392,10 @@ struct ContentView: View {
         loadFile(url)
     }
 
-    private func loadFile(_ url: URL) {
+    /// - Parameter reportsFailure: when false, a failed read leaves the current
+    ///   document untouched and silent. Used for file-watcher reloads, which fire
+    ///   mid-replace while the path is briefly gone.
+    private func loadFile(_ url: URL, reportsFailure: Bool = true) {
         let previousURL = fileURL
         // Held only for the duration of the read unless the load succeeds, in
         // which case it replaces the token of the previously open document.
@@ -409,8 +412,20 @@ struct ContentView: View {
             startWatchingFile(at: url, forceRestart: previousURL != url)
             RecentDocumentsManager.shared.addURL(url)
         } catch {
-            let message = "Error loading file: \(error.localizedDescription)"
-            setDocumentText(message, modified: false)
+            // Leave the buffer and fileURL alone: overwriting them would point
+            // the editor at the previously open file while showing content the
+            // user never typed, and a later save would clobber that file.
+            guard reportsFailure else { return }
+
+            if !FileManager.default.fileExists(atPath: url.path) {
+                RecentDocumentsManager.shared.remove(url)
+            }
+
+            let alert = NSAlert()
+            alert.messageText = "Could not open \u{201C}\(url.lastPathComponent)\u{201D}"
+            alert.informativeText = error.localizedDescription
+            alert.alertStyle = .warning
+            alert.runModal()
         }
     }
 
@@ -443,7 +458,7 @@ struct ContentView: View {
                         return
                     }
                 }
-                self.loadFile(url)
+                self.loadFile(url, reportsFailure: false)
             }
         }
         fileWatcher?.start()
