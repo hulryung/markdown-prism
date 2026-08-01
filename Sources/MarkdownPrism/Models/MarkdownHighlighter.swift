@@ -31,6 +31,10 @@ final class MarkdownHighlighter {
 
     private var markdownRules: [HighlightRule]
 
+    /// Fence markers counted at the last full highlight. nil until one has run,
+    /// which forces the first incremental call through the full path.
+    private var lastFenceMarkerCount: Int?
+
     init(fontSize: CGFloat = ZoomState.baseEditorFontSize) {
         self.fontSize = fontSize
         codeBlockPattern = try? NSRegularExpression(pattern: "^```[\\s\\S]*?^```", options: .anchorsMatchLines)
@@ -121,7 +125,8 @@ final class MarkdownHighlighter {
 
     func highlight(_ textStorage: NSTextStorage) {
         let text = textStorage.string
-        let fullRange = NSRange(location: 0, length: (text as NSString).length)
+        let nsText = text as NSString
+        let fullRange = NSRange(location: 0, length: nsText.length)
 
         textStorage.beginEditing()
 
@@ -132,11 +137,8 @@ final class MarkdownHighlighter {
         ], range: fullRange)
 
         // 1. Find code block ranges to exclude from markdown highlighting
-        var excludedRanges: [NSRange] = []
-
-        codeBlockPattern?.enumerateMatches(in: text, options: [], range: fullRange) { match, _, _ in
-            guard let range = match?.range else { return }
-            excludedRanges.append(range)
+        let fenceRanges = codeBlockRanges(in: text, range: fullRange)
+        for range in fenceRanges {
             // Style the entire code block with gray background
             textStorage.addAttributes([
                 .backgroundColor: NSColor.quaternaryLabelColor,
@@ -144,30 +146,21 @@ final class MarkdownHighlighter {
             ], range: range)
         }
 
-        inlineCodePattern?.enumerateMatches(in: text, options: [], range: fullRange) { match, _, _ in
-            guard let range = match?.range else { return }
-            if !Self.hasIntersectingRange(excludedRanges, with: range) {
-                excludedRanges.append(range)
-                textStorage.addAttributes([
-                    .backgroundColor: NSColor.quaternaryLabelColor
-                ], range: range)
-            }
-        }
+        let inlineRanges = applyInlineCode(
+            to: textStorage,
+            text: text,
+            in: fullRange,
+            skipping: fenceRanges
+        )
 
-        excludedRanges.sort { $0.location < $1.location }
+        let excludedRanges = Self.merged(fenceRanges, inlineRanges)
 
         // 2. Apply markdown rules only outside code blocks
-        for rule in markdownRules {
-            rule.pattern.enumerateMatches(in: text, options: [], range: fullRange) { match, _, _ in
-                guard let matchRange = match?.range else { return }
-                let isInsideCode = Self.hasIntersectingRange(excludedRanges, with: matchRange)
-                if !isInsideCode {
-                    textStorage.addAttributes(rule.attributes, range: matchRange)
-                }
-            }
-        }
+        applyRules(to: textStorage, text: text, in: fullRange, excluding: excludedRanges)
 
         textStorage.endEditing()
+
+        lastFenceMarkerCount = Self.fenceMarkerCount(in: nsText)
     }
 
     func highlight(_ textStorage: NSTextStorage, in editedRange: NSRange) {
@@ -176,15 +169,26 @@ final class MarkdownHighlighter {
 
         guard nsText.length > 0 else { return }
 
-        // Fence boundaries change global exclusion state, so any document
-        // containing a fence must go through the full re-highlight path.
-        guard !text.contains("```") else {
+        // Adding or removing a fence marker flips the code/not-code state of
+        // every line after it, so only that case needs a full re-highlight.
+        // While the marker count holds steady, fence membership outside the
+        // edit is stable and the fence ranges recomputed below are enough.
+        let fenceMarkerCount = Self.fenceMarkerCount(in: nsText)
+        guard fenceMarkerCount == lastFenceMarkerCount else {
             highlight(textStorage)
             return
         }
 
-        let clampedRange = NSIntersectionRange(editedRange, NSRange(location: 0, length: nsText.length))
-        let range = nsText.paragraphRange(for: clampedRange)
+        let fullRange = NSRange(location: 0, length: nsText.length)
+        let allFenceRanges = codeBlockRanges(in: text, range: fullRange)
+
+        let clampedRange = NSIntersectionRange(editedRange, fullRange)
+        var range = nsText.paragraphRange(for: clampedRange)
+        // An edit inside a fenced block must restyle the whole block, since the
+        // block is styled as one unit rather than paragraph by paragraph.
+        for fence in allFenceRanges where NSIntersectionRange(fence, range).length > 0 {
+            range = NSUnionRange(range, fence)
+        }
 
         textStorage.beginEditing()
 
@@ -194,27 +198,94 @@ final class MarkdownHighlighter {
             .foregroundColor: baseColor
         ], range: range)
 
-        var excludedRanges: [NSRange] = []
+        var fenceRanges: [NSRange] = []
+        for fence in allFenceRanges {
+            let visible = NSIntersectionRange(fence, range)
+            guard visible.length > 0 else { continue }
+            fenceRanges.append(visible)
+            textStorage.addAttributes([
+                .backgroundColor: NSColor.quaternaryLabelColor,
+                .foregroundColor: NSColor.secondaryLabelColor
+            ], range: visible)
+        }
 
-        inlineCodePattern?.enumerateMatches(in: text, options: [], range: range) { match, _, _ in
+        let inlineRanges = applyInlineCode(
+            to: textStorage,
+            text: text,
+            in: range,
+            skipping: fenceRanges
+        )
+
+        let excludedRanges = Self.merged(fenceRanges, inlineRanges)
+
+        applyRules(to: textStorage, text: text, in: range, excluding: excludedRanges)
+
+        textStorage.endEditing()
+    }
+
+    /// Fence ranges intersecting `range`, in ascending order.
+    private func codeBlockRanges(in text: String, range: NSRange) -> [NSRange] {
+        guard let codeBlockPattern else { return [] }
+        return codeBlockPattern.matches(in: text, options: [], range: range).map(\.range)
+    }
+
+    /// Styles inline code spans within `range` and returns the styled ranges.
+    private func applyInlineCode(
+        to textStorage: NSTextStorage,
+        text: String,
+        in range: NSRange,
+        skipping fenceRanges: [NSRange]
+    ) -> [NSRange] {
+        guard let inlineCodePattern else { return [] }
+
+        var inlineRanges: [NSRange] = []
+        inlineCodePattern.enumerateMatches(in: text, options: [], range: range) { match, _, _ in
             guard let matchRange = match?.range else { return }
-            excludedRanges.append(matchRange)
+            guard !Self.hasIntersectingRange(fenceRanges, with: matchRange) else { return }
+            inlineRanges.append(matchRange)
             textStorage.addAttributes([
                 .backgroundColor: NSColor.quaternaryLabelColor
             ], range: matchRange)
         }
+        return inlineRanges
+    }
 
+    private func applyRules(
+        to textStorage: NSTextStorage,
+        text: String,
+        in range: NSRange,
+        excluding excludedRanges: [NSRange]
+    ) {
         for rule in markdownRules {
             rule.pattern.enumerateMatches(in: text, options: [], range: range) { match, _, _ in
                 guard let matchRange = match?.range else { return }
-                let isInsideCode = excludedRanges.contains { NSIntersectionRange($0, matchRange).length > 0 }
+                let isInsideCode = Self.hasIntersectingRange(excludedRanges, with: matchRange)
                 if !isInsideCode {
                     textStorage.addAttributes(rule.attributes, range: matchRange)
                 }
             }
         }
+    }
 
-        textStorage.endEditing()
+    /// `hasIntersectingRange` binary-searches, so the two ascending sources are
+    /// merged into a single ascending array rather than simply concatenated.
+    private static func merged(_ fenceRanges: [NSRange], _ inlineRanges: [NSRange]) -> [NSRange] {
+        guard !inlineRanges.isEmpty else { return fenceRanges }
+        guard !fenceRanges.isEmpty else { return inlineRanges }
+        return (fenceRanges + inlineRanges).sorted { $0.location < $1.location }
+    }
+
+    private static func fenceMarkerCount(in text: NSString) -> Int {
+        var count = 0
+        var searchRange = NSRange(location: 0, length: text.length)
+        while searchRange.length > 0 {
+            let found = text.range(of: "```", range: searchRange)
+            guard found.location != NSNotFound else { break }
+            count += 1
+            let next = found.location + found.length
+            searchRange = NSRange(location: next, length: text.length - next)
+        }
+        return count
     }
 
     private static func hasIntersectingRange(_ sortedRanges: [NSRange], with range: NSRange) -> Bool {

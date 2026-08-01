@@ -122,6 +122,79 @@ final class MarkdownHighlighterTests: XCTestCase {
         XCTAssertTrue(boldFont.fontDescriptor.symbolicTraits.contains(.bold))
     }
 
+    func test_highlightInRange_documentWithFence_stylesEditedParagraphIncrementally() throws {
+        let highlighter = MarkdownHighlighter(fontSize: 14)
+        let markdown = "**bold**\n```\n# fenced\n```\ntail"
+        let textStorage = NSTextStorage(string: markdown)
+        highlighter.highlight(textStorage)
+
+        let boldRange = (markdown as NSString).range(of: "**bold**")
+        highlighter.highlight(textStorage, in: boldRange)
+
+        let boldFont = try XCTUnwrap(
+            textStorage.attributes(at: boldRange.location + 2, effectiveRange: nil)[.font] as? NSFont
+        )
+        XCTAssertTrue(boldFont.fontDescriptor.symbolicTraits.contains(.bold))
+
+        // The untouched fence keeps its code styling instead of being reset.
+        let fencedIndex = markdown.utf16Distance(of: "# fenced")
+        let fencedAttributes = textStorage.attributes(at: fencedIndex, effectiveRange: nil)
+        XCTAssertEqual(fencedAttributes[.foregroundColor] as? NSColor, .secondaryLabelColor)
+        XCTAssertEqual(fencedAttributes[.backgroundColor] as? NSColor, .quaternaryLabelColor)
+    }
+
+    func test_highlightInRange_editInsideFence_restylesWholeBlock() throws {
+        let highlighter = MarkdownHighlighter(fontSize: 14)
+        let markdown = "intro\n```\n# one\n# two\n```\ntail"
+        let textStorage = NSTextStorage(string: markdown)
+        highlighter.highlight(textStorage)
+
+        let editedLine = (markdown as NSString).range(of: "# one")
+        highlighter.highlight(textStorage, in: editedLine)
+
+        for line in ["# one", "# two"] {
+            let attributes = textStorage.attributes(at: markdown.utf16Distance(of: line), effectiveRange: nil)
+            XCTAssertEqual(attributes[.foregroundColor] as? NSColor, .secondaryLabelColor, line)
+            XCTAssertEqual(attributes[.backgroundColor] as? NSColor, .quaternaryLabelColor, line)
+        }
+    }
+
+    func test_highlightInRange_afterFenceMarkerAdded_fallsBackToFullHighlight() throws {
+        let highlighter = MarkdownHighlighter(fontSize: 14)
+        let textStorage = NSTextStorage(string: "# heading\ntail")
+        highlighter.highlight(textStorage)
+
+        // Typing a fence pair flips the heading into code, which only a full
+        // re-highlight can pick up.
+        let updated = "```\n# heading\n```\ntail"
+        textStorage.replaceCharacters(
+            in: NSRange(location: 0, length: textStorage.length),
+            with: updated
+        )
+        let tailRange = (updated as NSString).range(of: "tail")
+        highlighter.highlight(textStorage, in: tailRange)
+
+        let attributes = textStorage.attributes(at: updated.utf16Distance(of: "# heading"), effectiveRange: nil)
+        XCTAssertEqual(attributes[.foregroundColor] as? NSColor, .secondaryLabelColor)
+        XCTAssertEqual(attributes[.backgroundColor] as? NSColor, .quaternaryLabelColor)
+    }
+
+    func test_highlightInRange_inlineCodeOutsideFence_keepsRulesOff() throws {
+        let highlighter = MarkdownHighlighter(fontSize: 14)
+        let markdown = "```\nfence\n```\nuse `**not bold**` here"
+        let textStorage = NSTextStorage(string: markdown)
+        highlighter.highlight(textStorage)
+
+        let editedLine = (markdown as NSString).range(of: "use `**not bold**` here")
+        highlighter.highlight(textStorage, in: editedLine)
+
+        let insideBackticks = markdown.utf16Distance(of: "**not bold**") + 2
+        let attributes = textStorage.attributes(at: insideBackticks, effectiveRange: nil)
+        let font = try XCTUnwrap(attributes[.font] as? NSFont)
+        XCTAssertEqual(attributes[.backgroundColor] as? NSColor, .quaternaryLabelColor)
+        XCTAssertFalse(font.fontDescriptor.symbolicTraits.contains(.bold))
+    }
+
     func test_highlightInRange_stylesEditedParagraphInPlainDocument() throws {
         let highlighter = MarkdownHighlighter(fontSize: 14)
         let markdown = "plain line\n**bold**\nanother line"
