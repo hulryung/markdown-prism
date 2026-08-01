@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- A Quick Look preview renders whatever file Finder points at, and
+       markdown-it passes raw HTML through. DOMPurify drops scripts, but an
+       <img> aimed at a remote host would still phone home, so this shell is
+       locked down. The in-app preview (preview.html) deliberately allows
+       remote images and is otherwise identical; keep the tags below in sync. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="vendor/katex.min.css">
+  <link rel="stylesheet" href="vendor/github.min.css" media="(prefers-color-scheme: light)">
+  <link rel="stylesheet" href="vendor/github-dark.min.css" media="(prefers-color-scheme: dark)">
+  <script src="vendor/highlight.min.js"></script>
+  <script defer src="vendor/katex.min.js"></script>
+  <script defer src="vendor/auto-render.min.js"></script>
+  <script src="vendor/markdown-it.min.js"></script>
+  <script src="vendor/markdown-it-task-lists.min.js"></script>
+  <script src="vendor/markdown-it-emoji.min.js"></script>
+  <script src="vendor/purify.min.js"></script>
+  <script src="vendor/mermaid.min.js"></script>
+  <script src="js/preview.js"></script>
+</head>
+<body>
+  <main id="content"></main>
+</body>
+</html>

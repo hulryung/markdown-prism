@@ -5,7 +5,7 @@ import Quartz
 class PreviewViewController: NSViewController, QLPreviewingController, WKNavigationDelegate {
     private var webView: WKWebView!
     private var completionHandler: ((Error?) -> Void)?
-    private var tempDir: URL?
+    private var markdown = ""
 
     override func loadView() {
         let config = WKWebViewConfiguration()
@@ -15,7 +15,6 @@ class PreviewViewController: NSViewController, QLPreviewingController, WKNavigat
     }
 
     func preparePreviewOfFile(at url: URL, completionHandler handler: @escaping (Error?) -> Void) {
-        let markdown: String
         do {
             let data = try Data(contentsOf: url)
             markdown = String(data: data, encoding: .utf8)
@@ -26,89 +25,43 @@ class PreviewViewController: NSViewController, QLPreviewingController, WKNavigat
             return
         }
 
-        guard let resourcesURL = Bundle.main.url(
-            forResource: "preview",
+        // The Quick Look shell carries a strict Content-Security-Policy; the
+        // in-app preview.html is the same page without it.
+        guard let templateURL = Bundle.main.url(
+            forResource: "preview-quicklook",
             withExtension: "html",
             subdirectory: "Resources"
-        )?.deletingLastPathComponent() else {
-            handler(CocoaError(.fileReadCorruptFile))
+        ) else {
+            handler(CocoaError(.fileNoSuchFile))
             return
         }
 
-        do {
-            let (htmlURL, dir) = try buildPreviewHTML(
-                markdown: markdown,
-                resourcesURL: resourcesURL
-            )
-            cleanup()
-            self.tempDir = dir
-            self.completionHandler = handler
-            webView.loadFileURL(htmlURL, allowingReadAccessTo: dir)
-        } catch {
-            handler(error)
-        }
-    }
-
-    private func buildPreviewHTML(markdown: String, resourcesURL: URL) throws -> (htmlURL: URL, tempDir: URL) {
-        let templateURL = resourcesURL.appendingPathComponent("preview.html")
-        let templateHTML = try String(contentsOf: templateURL, encoding: .utf8)
-
-        let encoded = try JSONEncoder().encode(markdown)
-        guard let jsonString = String(data: encoded, encoding: .utf8) else {
-            throw CocoaError(.coderInvalidValue)
-        }
-
-        let safe = jsonString
-            .replacingOccurrences(of: "<", with: "\\u003c")
-            .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
-            .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
-
-        // Embed markdown content directly — replace the empty initial render call
-        var modifiedHTML = templateHTML.replacingOccurrences(
-            of: "renderMarkdown('');",
-            with: "renderMarkdown(\(safe));"
+        completionHandler = handler
+        // Loaded straight out of the bundle. Staging a copy of css/ and vendor/
+        // in a temp directory cost 3.5MB of file writes on every preview.
+        webView.loadFileURL(
+            templateURL,
+            allowingReadAccessTo: templateURL.deletingLastPathComponent()
         )
-
-        let csp = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'\">"
-        modifiedHTML = modifiedHTML.replacingOccurrences(
-            of: "<meta charset=\"utf-8\">",
-            with: "<meta charset=\"utf-8\">" + csp
-        )
-
-        // Create temp directory with copies of bundle resources
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ql-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-
-        let fm = FileManager.default
-        for subdir in ["css", "vendor"] {
-            let source = resourcesURL.appendingPathComponent(subdir)
-            let dest = dir.appendingPathComponent(subdir)
-            try fm.copyItem(at: source, to: dest)
-        }
-
-        let htmlURL = dir.appendingPathComponent("preview.html")
-        try modifiedHTML.write(to: htmlURL, atomically: true, encoding: .utf8)
-
-        return (htmlURL, dir)
-    }
-
-    private func cleanup() {
-        if let dir = tempDir {
-            try? FileManager.default.removeItem(at: dir)
-            tempDir = nil
-        }
-    }
-
-    deinit {
-        cleanup()
     }
 
     // MARK: - WKNavigationDelegate
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        completionHandler?(nil)
+        guard let handler = completionHandler else { return }
         completionHandler = nil
+
+        guard let encoded = try? JSONEncoder().encode(markdown),
+              let jsonString = String(data: encoded, encoding: .utf8) else {
+            handler(CocoaError(.coderInvalidValue))
+            return
+        }
+
+        // The template defines renderMarkdown on DOMContentLoaded, which has
+        // fired by the time the load finishes.
+        webView.evaluateJavaScript("window.renderMarkdown(\(jsonString));") { _, error in
+            handler(error)
+        }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
