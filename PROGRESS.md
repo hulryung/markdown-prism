@@ -78,8 +78,12 @@ Tests/MarkdownPrismTests/
 - Version lives once, as `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in
   `project.yml`. Both `Info.plist` files are generated from it by xcodegen — do
   not edit them by hand.
+- `scripts/build-dmg.sh` builds and signs the Release app and packages
+  `build/MarkdownPrism-<version>.dmg`. Set `NOTARY_PROFILE` to a notarytool
+  keychain profile to notarize and staple in the same run; without it the DMG
+  is signed but Gatekeeper rejects it on other Macs.
+- `scripts/validate-dmg.sh <dmg>` checks the app bundle name inside the DMG.
 - `scripts/update-cask.sh <dmg>` regenerates the Homebrew cask, reading the
   version from `project.yml` and the app name from the DMG.
-- `scripts/validate-dmg.sh` checks a built DMG before release.
 - CI (`.github/workflows/ci.yml`) runs `swift build`, `swift test`, and an
   xcodegen + xcodebuild Release build on every push and pull request.
