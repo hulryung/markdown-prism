@@ -82,7 +82,27 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 
+  // Stamps every top-level block with the markdown line it came from, which is
+  // what scroll syncing maps editor position onto.
+  function markdownitSourceLines(md) {
+    md.core.ruler.push('source_lines', function (state) {
+      var tokens = state.tokens;
+      for (var i = 0; i < tokens.length; i++) {
+        var token = tokens[i];
+        if (!token.map) continue;
+        if (token.nesting === 1 ||
+            token.type === 'fence' ||
+            token.type === 'code_block' ||
+            token.type === 'hr' ||
+            token.type === 'html_block') {
+          token.attrSet('data-source-line', String(token.map[0]));
+        }
+      }
+    });
+  }
+
   md.use(markdownitHeadingAnchor);
+  md.use(markdownitSourceLines);
 
   if (window.markdownitTaskLists) {
     md.use(window.markdownitTaskLists, { enabled: false, label: true, labelAfter: true });
@@ -105,6 +125,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
       var holder = document.createElement('div');
       holder.dataset.mermaidSrc = src;
+      // Carry the source line across, or the diagram becomes a hole in the
+      // line map that scroll syncing interpolates over.
+      var sourceLine = parentPre.getAttribute('data-source-line');
+      if (sourceLine !== null) {
+        holder.setAttribute('data-source-line', sourceLine);
+      }
       if (mermaidCache.has(src)) {
         holder.innerHTML = mermaidCache.get(src);
       } else {
@@ -144,6 +170,15 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  // Suppresses the scroll events our own scrolling produces, so a sync coming
+  // from the editor is not echoed straight back at it.
+  var suppressScrollReportUntil = 0;
+
+  function scrollWithoutReporting(y) {
+    suppressScrollReportUntil = Date.now() + 100;
+    window.scrollTo(0, y);
+  }
+
   function renderMarkdown(markdown) {
     lastMarkdown = markdown || '';
 
@@ -163,14 +198,95 @@ document.addEventListener('DOMContentLoaded', function () {
     var content = document.getElementById('content');
     content.innerHTML = html;
     renderMath();
-    window.scrollTo(0, y);
+    scrollWithoutReporting(y);
     renderMermaidBlocks().then(function () {
-      window.scrollTo(0, y);
+      scrollWithoutReporting(y);
     });
   }
 
   window.renderMarkdown = renderMarkdown;
   renderMarkdown('');
+
+  // --- Scroll sync ---
+
+  function sourceLineAnchors() {
+    var els = document.querySelectorAll('#content [data-source-line]');
+    var anchors = [];
+    for (var i = 0; i < els.length; i++) {
+      anchors.push({
+        line: parseInt(els[i].getAttribute('data-source-line'), 10),
+        top: els[i].getBoundingClientRect().top + window.scrollY
+      });
+    }
+    return anchors;
+  }
+
+  // Blocks cover ranges of lines, so both directions interpolate between the
+  // anchors on either side instead of snapping to the nearest block.
+  window.scrollToSourceLine = function (line) {
+    var anchors = sourceLineAnchors();
+    if (anchors.length === 0) return;
+
+    var prev = null;
+    var next = null;
+    for (var i = 0; i < anchors.length; i++) {
+      if (anchors[i].line <= line) {
+        prev = anchors[i];
+      } else {
+        next = anchors[i];
+        break;
+      }
+    }
+
+    if (!prev) {
+      scrollWithoutReporting(0);
+      return;
+    }
+
+    var y = prev.top;
+    if (next && next.line > prev.line) {
+      var ratio = (line - prev.line) / (next.line - prev.line);
+      y = prev.top + (next.top - prev.top) * ratio;
+    }
+    scrollWithoutReporting(y);
+  };
+
+  window.currentSourceLine = function () {
+    var anchors = sourceLineAnchors();
+    if (anchors.length === 0) return 0;
+
+    var y = window.scrollY;
+    var prev = null;
+    var next = null;
+    for (var i = 0; i < anchors.length; i++) {
+      if (anchors[i].top <= y + 1) {
+        prev = anchors[i];
+      } else {
+        next = anchors[i];
+        break;
+      }
+    }
+
+    if (!prev) return 0;
+    if (!next || next.top <= prev.top) return prev.line;
+
+    var ratio = (y - prev.top) / (next.top - prev.top);
+    return Math.round(prev.line + (next.line - prev.line) * ratio);
+  };
+
+  var scrollReportPending = false;
+  window.addEventListener('scroll', function () {
+    if (Date.now() < suppressScrollReportUntil) return;
+    if (scrollReportPending) return;
+    if (!window.webkit || !window.webkit.messageHandlers ||
+        !window.webkit.messageHandlers.previewScrolled) return;
+
+    scrollReportPending = true;
+    window.requestAnimationFrame(function () {
+      scrollReportPending = false;
+      window.webkit.messageHandlers.previewScrolled.postMessage(window.currentSourceLine());
+    });
+  });
 
   // --- Find in preview ---
   var _findMatches = [];

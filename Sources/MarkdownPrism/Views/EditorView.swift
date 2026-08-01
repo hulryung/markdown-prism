@@ -10,6 +10,7 @@ struct EditorView: NSViewRepresentable {
     let replaceText: String
     let replaceRevision: Int
     let replaceAllRevision: Int
+    let scrollSync: ScrollSyncBus
     var onEscapePressed: (() -> Void)?
 
     func makeCoordinator() -> Coordinator {
@@ -52,8 +53,11 @@ struct EditorView: NSViewRepresentable {
 
         textView.string = text
         context.coordinator.highlighter.highlight(textView.textStorage!)
+        context.coordinator.rebuildLineIndex(for: text)
 
         scrollView.documentView = textView
+        context.coordinator.observeScrolling(of: scrollView)
+        context.coordinator.bind(to: scrollSync)
         return scrollView
     }
 
@@ -78,7 +82,9 @@ struct EditorView: NSViewRepresentable {
             textView.string = text
             textView.selectedRanges = selectedRanges
             context.coordinator.noteExternalTextChange()
+            context.coordinator.rebuildLineIndex(for: text)
         }
+        context.coordinator.bind(to: scrollSync)
 
         // Re-highlight only when text changed externally or font size changed.
         // Per-keystroke highlights are debounced in textDidChange.
@@ -127,6 +133,9 @@ struct EditorView: NSViewRepresentable {
 
         deinit {
             highlightWork?.cancel()
+            if let scrollObserver {
+                NotificationCenter.default.removeObserver(scrollObserver)
+            }
         }
 
         func textDidChange(_ notification: Notification) {
@@ -135,7 +144,79 @@ struct EditorView: NSViewRepresentable {
             textRevision += 1
             let editedRange = textView.selectedRange()
             parent.text = textView.string
+            rebuildLineIndex(for: textView.string)
             scheduleHighlight(for: textView, editedRange: editedRange)
+        }
+
+        // MARK: - Scroll Sync
+
+        private var lineIndex = LineIndex("")
+        private var scrollObserver: NSObjectProtocol?
+        private var lastReportedLine = -1
+        private var suppressScrollReportUntil = Date.distantPast
+        private weak var scrollSync: ScrollSyncBus?
+
+        func rebuildLineIndex(for text: String) {
+            lineIndex = LineIndex(text)
+        }
+
+        func bind(to scrollSync: ScrollSyncBus) {
+            self.scrollSync = scrollSync
+            scrollSync.scrollEditor = { [weak self] line in
+                self?.scroll(toLine: line)
+            }
+        }
+
+        func observeScrolling(of scrollView: NSScrollView) {
+            scrollView.contentView.postsBoundsChangedNotifications = true
+            scrollObserver = NotificationCenter.default.addObserver(
+                forName: NSView.boundsDidChangeNotification,
+                object: scrollView.contentView,
+                queue: .main
+            ) { [weak self, weak scrollView] _ in
+                guard let self, let scrollView else { return }
+                self.reportScroll(in: scrollView)
+            }
+        }
+
+        private func reportScroll(in scrollView: NSScrollView) {
+            guard Date() >= suppressScrollReportUntil,
+                  let textView = scrollView.documentView as? NSTextView,
+                  let layoutManager = textView.layoutManager,
+                  let container = textView.textContainer else { return }
+
+            let top = scrollView.contentView.bounds.minY - textView.textContainerInset.height
+            let glyphIndex = layoutManager.glyphIndex(
+                for: CGPoint(x: 0, y: max(0, top)),
+                in: container
+            )
+            let charIndex = layoutManager.characterIndexForGlyph(at: glyphIndex)
+            let line = lineIndex.line(forOffset: charIndex)
+
+            guard line != lastReportedLine else { return }
+            lastReportedLine = line
+            scrollSync?.editorDidScroll(toLine: line)
+        }
+
+        private func scroll(toLine line: Int) {
+            guard let textView,
+                  let scrollView = textView.enclosingScrollView,
+                  let layoutManager = textView.layoutManager,
+                  let container = textView.textContainer else { return }
+
+            let offset = lineIndex.offset(forLine: line)
+            let glyphRange = layoutManager.glyphRange(
+                forCharacterRange: NSRange(location: offset, length: 0),
+                actualCharacterRange: nil
+            )
+            let rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: container)
+
+            // The scroll we are about to make would otherwise come back as a
+            // user scroll and bounce the preview.
+            suppressScrollReportUntil = Date().addingTimeInterval(0.1)
+            lastReportedLine = line
+            scrollView.contentView.scroll(to: CGPoint(x: 0, y: rect.minY))
+            scrollView.reflectScrolledClipView(scrollView.contentView)
         }
 
         func cancelPendingHighlight() {

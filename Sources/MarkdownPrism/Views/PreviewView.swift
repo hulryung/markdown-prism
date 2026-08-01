@@ -8,6 +8,7 @@ struct PreviewView: NSViewRepresentable {
     let searchRevision: Int
     let isRegex: Bool
     let useFullWidth: Bool
+    let scrollSync: ScrollSyncBus
     var fileURL: URL?
     var onOpenFile: ((URL) -> Void)?
     var onSearchResults: ((Int, Int) -> Void)?
@@ -20,6 +21,7 @@ struct PreviewView: NSViewRepresentable {
         let config = WKWebViewConfiguration()
         let handler = WeakScriptMessageHandler(delegate: context.coordinator)
         config.userContentController.add(handler, name: "linkClicked")
+        config.userContentController.add(handler, name: "previewScrolled")
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.pageZoom = zoomScale
@@ -33,6 +35,7 @@ struct PreviewView: NSViewRepresentable {
         context.coordinator.fileURL = fileURL
         context.coordinator.onOpenFile = onOpenFile
         context.coordinator.onSearchResults = onSearchResults
+        context.coordinator.bind(to: scrollSync)
 
         let templateURL: URL? = {
             #if SWIFT_PACKAGE
@@ -68,6 +71,7 @@ struct PreviewView: NSViewRepresentable {
         c.fileURL = fileURL
         c.onOpenFile = onOpenFile
         c.onSearchResults = onSearchResults
+        c.bind(to: scrollSync)
         if c.isLoaded {
             c.sync()
         }
@@ -90,6 +94,19 @@ struct PreviewView: NSViewRepresentable {
         var fileURL: URL?
         var onOpenFile: ((URL) -> Void)?
         var onSearchResults: ((Int, Int) -> Void)?
+        private weak var scrollSync: ScrollSyncBus?
+
+        func bind(to scrollSync: ScrollSyncBus) {
+            self.scrollSync = scrollSync
+            scrollSync.scrollPreview = { [weak self] line in
+                self?.scrollToSourceLine(line)
+            }
+        }
+
+        private func scrollToSourceLine(_ line: Int) {
+            guard isLoaded, let webView else { return }
+            webView.evaluateJavaScript("window.scrollToSourceLine(\(line));") { _, _ in }
+        }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             isLoaded = true
@@ -114,11 +131,16 @@ struct PreviewView: NSViewRepresentable {
             _ userContentController: WKUserContentController,
             didReceive message: WKScriptMessage
         ) {
-            guard message.name == "linkClicked",
-                  let href = message.body as? String else {
-                return
+            switch message.name {
+            case "linkClicked":
+                guard let href = message.body as? String else { return }
+                handleLinkClick(href: href)
+            case "previewScrolled":
+                guard let line = message.body as? NSNumber else { return }
+                scrollSync?.previewDidScroll(toLine: line.intValue)
+            default:
+                break
             }
-            handleLinkClick(href: href)
         }
 
         func sync() {

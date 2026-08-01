@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var fileURL: URL?
     @State private var fileWatcher: FileWatcher?
     @State private var scopedAccess: SecurityScopedAccess?
+    @State private var scrollSync = ScrollSyncBus()
     @State private var showEditor = true
     @State private var debounceWork: DispatchWorkItem?
     @State private var ignoreNextTextChange = false
@@ -131,7 +132,12 @@ struct ContentView: View {
                 requestOpen(url)
             }
         }
+        .onChange(of: showEditor) {
+            // Nothing to follow along with while the editor is hidden.
+            scrollSync.isEnabled = showEditor
+        }
         .onAppear {
+            scrollSync.isEnabled = showEditor
             openFileState.saveHandler = { self.saveFile() }
             if let url = openFileState.pendingURL {
                 openFileState.pendingURL = nil
@@ -185,6 +191,7 @@ struct ContentView: View {
             replaceText: replaceText,
             replaceRevision: replaceRevision,
             replaceAllRevision: replaceAllRevision,
+            scrollSync: scrollSync,
             onEscapePressed: isSearchVisible ? dismissSearch : nil
         )
         .frame(minWidth: 300)
@@ -198,6 +205,7 @@ struct ContentView: View {
             searchRevision: searchRevision,
             isRegex: isRegex,
             useFullWidth: useFullWidth,
+            scrollSync: scrollSync,
             fileURL: fileURL,
             onOpenFile: { url in requestOpen(url) },
             onSearchResults: { count, current in
