@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var previewText = ContentView.welcomeMarkdown
     @State private var fileURL: URL?
     @State private var fileWatcher: FileWatcher?
+    @State private var scopedAccess: SecurityScopedAccess?
     @State private var showEditor = true
     @State private var debounceWork: DispatchWorkItem?
     @State private var ignoreNextTextChange = false
@@ -280,6 +281,7 @@ struct ContentView: View {
         fileWatcher?.stop()
         fileWatcher = nil
         fileURL = nil
+        scopedAccess = nil
         setDocumentText("", modified: false)
     }
 
@@ -329,6 +331,9 @@ struct ContentView: View {
 
         if url != fileURL {
             fileURL = url
+            // The save panel grants access to the new URL for this session, so
+            // the token for the previously open document can be released.
+            scopedAccess = nil
             startWatchingFile(at: url, forceRestart: true)
         }
 
@@ -389,9 +394,17 @@ struct ContentView: View {
 
     private func loadFile(_ url: URL) {
         let previousURL = fileURL
+        // Held only for the duration of the read unless the load succeeds, in
+        // which case it replaces the token of the previously open document.
+        let access = RecentDocumentsManager.shared.beginAccess(to: url)
         do {
             let document = try MarkdownDocument(fileURL: url)
             setDocumentText(document.text, modified: false)
+            // On a watcher-driven reload of the same file, keep the token
+            // already held rather than replacing it with nothing.
+            if access != nil || previousURL != url {
+                scopedAccess = access
+            }
             fileURL = url
             startWatchingFile(at: url, forceRestart: previousURL != url)
             RecentDocumentsManager.shared.addURL(url)

@@ -66,6 +66,65 @@ final class RecentDocumentsManagerTests: XCTestCase {
         XCTAssertTrue(reloaded.recentURLs.isEmpty)
     }
 
+    func testAddedURLSurvivesReload() throws {
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("md")
+        try "content".write(to: file, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        RecentDocumentsManager(defaults: defaults).addURL(file)
+
+        // A bookmark round-trip resolves symlinks, so the reloaded URL may be
+        // the /private/var form of the same file.
+        let reloaded = RecentDocumentsManager(defaults: defaults)
+        XCTAssertEqual(
+            reloaded.recentURLs.map { $0.resolvingSymlinksInPath() },
+            [file.resolvingSymlinksInPath()]
+        )
+    }
+
+    func testReaddingAFileByAnUnresolvedPathDoesNotDuplicateIt() throws {
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("md")
+        try "content".write(to: file, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        RecentDocumentsManager(defaults: defaults).addURL(file)
+
+        let reloaded = RecentDocumentsManager(defaults: defaults)
+        reloaded.addURL(file)
+
+        XCTAssertEqual(reloaded.recentURLs.count, 1)
+    }
+
+    func testRemoveDropsOnlyTheGivenURL() {
+        let manager = RecentDocumentsManager(defaults: defaults)
+        let first = URL(fileURLWithPath: "/tmp/first.md")
+        let second = URL(fileURLWithPath: "/tmp/second.md")
+
+        manager.addURL(first)
+        manager.addURL(second)
+        manager.remove(first)
+
+        XCTAssertEqual(manager.recentURLs, [second])
+    }
+
+    func testLegacyPathEntriesAreMigratedOnLoad() throws {
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("md")
+        try "content".write(to: file, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        defaults.set([file.path], forKey: "recentDocuments")
+
+        let manager = RecentDocumentsManager(defaults: defaults)
+        XCTAssertEqual(manager.recentURLs, [file])
+        XCTAssertNil(manager.entries.first?.bookmark)
+    }
+
     func testLoadDropsMissingFilesAndPreservesOrderOfSurvivors() throws {
         let survivorA = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
