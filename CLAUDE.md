@@ -20,18 +20,24 @@ Hybrid native + web rendering approach:
 - Sources/MarkdownPrism/App/ - App entry point
 - Sources/MarkdownPrism/Views/ - SwiftUI views
 - Sources/MarkdownPrism/Models/ - Data models
-- Sources/MarkdownPrism/Resources/ - HTML, JS, CSS for preview
+- Sources/MarkdownPrism/Resources/ - preview.html + preview-quicklook.html shells,
+  js/preview.js (shared rendering logic), css/, vendored vendor/
+- Sources/QuickLookExtension/ - Quick Look .appex
 - Tests/ - Unit and integration tests
 
 ## Build & Run
-swift build
-swift run  (or open in Xcode)
+swift build          # app target only; SwiftPM cannot build the .appex
+swift test
+xcodegen generate    # after adding/removing files, before any xcodebuild
+xcodebuild -scheme MarkdownPrism -configuration Release -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build
 
-## Phase Roadmap
-1. Phase 1: File viewer (WKWebView + markdown-it + highlight.js + KaTeX + Mermaid)
-2. Phase 2: Editor + real-time preview (split pane)
-3. Phase 3: Quick Look extension (.appex)
-4. Phase 4: Polish (themes, preferences, performance)
+project.yml is the source of truth for target settings and the version.
+Info.plist files are generated from it — never hand-edit them.
+
+## Status
+All four planned phases (viewer, editor, Quick Look, polish) shipped; the app is
+distributed via the hulryung/tap Homebrew cask. See PROGRESS.md for the current
+architecture and the list of open items.
 
 ## Conventions
 - Commit format: `Area: short imperative summary`

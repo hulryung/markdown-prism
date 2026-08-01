@@ -1,284 +1,85 @@
-# markdown-prism Progress Report
+# markdown-prism Status
 
-> Last Updated: 2026-02-14
-> Current Phase: Phase 3-4 Complete (All core phases done)
-> Status: Fully functional macOS markdown editor/viewer
+> Last updated: 2026-08-02
+> Status: shipping — signed, notarized, distributed via the `hulryung/tap` Homebrew cask
 
----
-
-## Phase 3-4 Summary (Latest)
-
-### Commits
-- `e4dfa3d` - App: add Info.plist with UTType declarations and default window size
-- `068c5fa` - Editor: add markdown syntax highlighting
-- `3817b58` - Preview: bundle JS/CSS libraries locally for offline support
-- `233f636` - App: improve file handling and save robustness
-
-### 새로 추가된 파일
-- `Sources/MarkdownPrism/Info.plist` - 앱 메타데이터, UTType, 파일 연결
-- `Sources/MarkdownPrism/Models/MarkdownHighlighter.swift` - Regex 기반 구문 하이라이팅
-- `Sources/MarkdownPrism/Resources/vendor/` - 로컬 번들 JS/CSS (30파일)
-  - markdown-it, highlight.js, KaTeX (+ 20 woff2 폰트), Mermaid
-
-### 주요 변경
-- **오프라인 지원**: 모든 CDN 의존성 로컬 번들링 (vendor/)
-- **에디터 구문 하이라이팅**: 헤더(파란), 볼드/이탤릭, 코드(회색 배경), 링크, 리스트(주황)
-- **앱 메타데이터**: Info.plist, UTType (.md/.markdown/.mdown/.mkd), 기본 윈도우 1200x800
-- **파일 인코딩**: UTF-8 + fallback (UTF-16, Latin1 등)
-- **Save 안정성**: 반환값 기반 성공 추적, 드롭 시 미저장 확인
+All four planned phases (viewer, editor, Quick Look, polish) are done. This
+document describes how the app is put together today and what is still open;
+per-release detail lives in the git history.
 
 ---
 
-## Phase 2 Summary
+## Architecture
 
-> Commit: `764b28d` - "App: add Phase 2 editor with split-pane preview and file operations"
-
-### 주요 기능
-- HSplitView 에디터 + 프리뷰 split pane (드래그 가능 디바이더)
-- 400ms 디바운스 실시간 프리뷰
-- 에디터 토글 (Cmd+Shift+E)
-- Save (Cmd+S), Save As (Cmd+Shift+S), New (Cmd+N)
-- 수정 표시 (제목표시줄 "-- Edited")
-- 미저장 변경 확인 다이얼로그
-
-### 해결된 이전 이슈
-- [x] 에디터 마크다운 구문 하이라이팅 (068c5fa)
-- [ ] 스크롤 동기화 (에디터 ↔ 프리뷰) - 향후
-- [ ] 에디터 줄번호 표시 - 향후
-
----
-
-## Phase 1 Summary
-
-> Commit: `f75e661` - "Preview: add highlight.js and fix Mermaid dark mode"
-> Base Commit: `b0c0ddc` - "App: add Phase 1 markdown viewer with WKWebView rendering"
-
-## 1. 프로젝트 개요
-
-macOS 네이티브 마크다운 뷰어. Swift/SwiftUI 앱 셸 + WKWebView 기반 하이브리드 렌더링.
-
-**지원 기능 목표**: GFM (테이블, 체크리스트, strikethrough), 코드 하이라이팅, LaTeX 수식, Mermaid 다이어그램
-
----
-
-## 2. 현재 파일 구조
+Native shell, web renderer:
 
 ```
-markdown-viewer/
-├── Package.swift                              # SPM 프로젝트 (macOS 14+, swift-tools-version 5.9)
-├── CLAUDE.md                                  # AI 에이전트용 프로젝트 컨텍스트
-├── README.md                                  # 프로젝트 소개
-├── .gitignore                                 # Swift/Xcode 제외 패턴
-├── .claude/settings.json                      # Claude Code 권한 설정
-└── Sources/MarkdownPrism/
-    ├── App/
-    │   └── MarkdownPrismApp.swift             # @main SwiftUI App (13줄)
-    ├── Views/
-    │   ├── ContentView.swift                  # 메인 뷰 + 파일 열기/드롭 (68줄)
-    │   └── PreviewView.swift                  # WKWebView NSViewRepresentable (64줄)
-    ├── Models/
-    │   ├── MarkdownDocument.swift             # 파일 읽기 모델 (11줄)
-    │   └── FileWatcher.swift                  # DispatchSource 파일 감시 (45줄)
-    └── Resources/
-        ├── preview.html                       # 렌더링 템플릿 + JS 파이프라인 (86줄)
-        └── css/
-            └── style.css                      # GitHub 스타일 CSS (315줄)
+[.md file] ──> MarkdownDocument ──> ContentView ──┬──> EditorView   (NSTextView + MarkdownHighlighter)
+                                                  └──> PreviewView  (WKWebView)
+                                                             │
+                                    evaluateJavaScript("renderMarkdown(...)")
+                                                             ▼
+                                        preview.html ──> js/preview.js
+                                                             │
+                            ┌────────────┬───────────┬───────┴──────┬──────────┐
+                            ▼            ▼           ▼              ▼          ▼
+                       markdown-it  highlight.js   KaTeX        Mermaid    DOMPurify
 ```
 
-**총 코드량**: 약 696줄 (12파일)
+- **Swift → JS**: markdown is JSON-encoded and passed to `window.renderMarkdown`.
+- **JS → Swift**: `WKScriptMessageHandler` for link clicks and preview scroll position.
+- **Rendering logic** lives in `Resources/js/preview.js`, shared by two shells:
+  - `preview.html` — in-app preview, allows remote images.
+  - `preview-quicklook.html` — same page under a strict Content-Security-Policy,
+    since a Quick Look preview renders whatever file Finder points at.
+- **Quick Look** (`Sources/QuickLookExtension`) loads that shell straight out of
+  the bundle; nothing is copied per preview.
+- All JS/CSS is vendored under `Resources/vendor/`. The app renders offline.
 
----
-
-## 3. 아키텍처 분석
-
-### 3.1 렌더링 파이프라인
+## Layout
 
 ```
-[.md 파일] → [Swift: String 읽기] → [evaluateJavaScript] → [JS: renderMarkdown()]
-                                                                    │
-                                              ┌─────────────────────┼──────────────────┐
-                                              ▼                     ▼                  ▼
-                                        [markdown-it]          [KaTeX]          [Mermaid.js]
-                                         GFM 파싱            수식 렌더링        다이어그램 렌더링
-                                              │
-                                              ▼
-                                      [highlight.js ???]
-                                      코드 하이라이팅
+Sources/MarkdownPrism/
+  App/         MarkdownPrismApp, AppDelegate, menu commands
+  Views/       ContentView, EditorView, PreviewView, FindBarView
+  Models/      MarkdownDocument, FileWatcher, MarkdownHighlighter, ZoomState,
+               RecentDocumentsManager, SecurityScopedAccess, LineIndex, ScrollSync,
+               DefaultAppHelper
+  Resources/   preview.html, preview-quicklook.html, js/, css/, vendor/
+Sources/QuickLookExtension/
+Tests/MarkdownPrismTests/
 ```
 
-### 3.2 Swift ↔ JavaScript 통신
+## Implemented
 
-- **Swift → JS**: `WKWebView.evaluateJavaScript("window.renderMarkdown(jsonString)")`
-- **문자열 이스케이프**: `JSONEncoder`로 마크다운 텍스트를 JSON 문자열로 인코딩 (안전한 방식)
-- **로딩 타이밍**: Coordinator 패턴으로 페이지 로드 완료 후 렌더링 보장
+- GFM rendering: tables, task lists, strikethrough, autolinks, emoji
+- Syntax highlighting (highlight.js), LaTeX (KaTeX), Mermaid diagrams
+- Split-pane editor with debounced live preview and markdown syntax highlighting
+- Two-way scroll sync between editor and preview
+- Find and replace, with regex, across both panes
+- Quick Look extension
+- File watching with reload prompts, atomic saves, encoding detection
+- Open Recent backed by security-scoped bookmarks, zoom, full-width toggle,
+  internal heading links, "set as default app"
 
-### 3.3 파일 감시
+## Open items
 
-- `FileWatcher`: `DispatchSource.makeFileSystemObjectSource`로 `.write`, `.rename`, `.delete` 이벤트 감시
-- 리소스 정리: `deinit`에서 `stop()` 호출, cancel handler에서 `close(fd)` 호출
+| Area | Item |
+|------|------|
+| Architecture | `OpenFileState` (`isModified`, `saveHandler`) is shared by every window, so restored multi-window sessions can cross wires. A per-document model or `DocumentGroup` would fix it and unlock tabs. |
+| Files | Saving always writes UTF-8, discarding the encoding `MarkdownDocument` detected. |
+| Files | The CLI argument path checks `fileExists` before security-scoped access begins (`MarkdownPrismApp.swift`). |
+| Editor | No line numbers. |
+| UI | No preferences panel (theme, font), no localization — the app is English-only while the site ships a Korean page. |
+| Testing | `js/preview.js` has no automated tests; the rendering pipeline is only covered by hand. |
 
----
+## Release
 
-## 4. 발견된 이슈 (리뷰 필요)
-
-### CRITICAL - 기능 누락
-
-#### Issue #1: highlight.js 미포함
-`preview.html`에 highlight.js `<script>` 태그가 없음. markdown-it의 `highlight` 옵션도 설정되지 않아 **코드 블록 구문 하이라이팅이 작동하지 않음**.
-
-```html
-<!-- 현재: highlight.js 관련 코드 없음 -->
-<!-- 필요: -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">
-<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
-```
-
-그리고 markdown-it 초기화에 highlight 옵션 추가 필요:
-```javascript
-const md = window.markdownit({
-    highlight: function (str, lang) {
-        if (lang && hljs.getLanguage(lang)) {
-            return hljs.highlight(str, { language: lang }).value;
-        }
-        return hljs.highlightAuto(str).value;
-    }
-});
-```
-
-#### Issue #2: FileWatcher 미연결
-`FileWatcher.swift`가 생성되었으나 `ContentView.swift`에서 **사용되지 않음**. 파일 외부 변경 시 자동 새로고침이 작동하지 않음.
-
-```swift
-// ContentView.swift에 추가 필요:
-@State private var fileWatcher: FileWatcher?
-
-private func loadFile(_ url: URL) {
-    // ... 기존 코드 ...
-    fileWatcher?.stop()
-    fileWatcher = FileWatcher(url: url) { [self] in
-        DispatchQueue.main.async { self.loadFile(url) }
-    }
-    fileWatcher?.start()
-}
-```
-
-#### Issue #3: Refresh 버튼 / 키보드 단축키 없음
-Task #3 요구사항에 있었으나 구현되지 않음:
-- Refresh 버튼 (Cmd+R)
-- Open 단축키 (Cmd+O)
-
-### MEDIUM - 개선 필요
-
-#### Issue #4: CSS 경로 해석 문제 가능성
-`preview.html`에서 `href="css/style.css"` 상대 경로 사용. WKWebView의 `loadFileURL`에서 `allowingReadAccessTo`가 `templateURL.deletingLastPathComponent()` (Resources 디렉토리)로 설정되어 있어 정상 동작해야 하나, 번들 구조에 따라 문제될 수 있음.
-
-#### Issue #5: CDN 의존성
-모든 JS 라이브러리가 CDN 로드. 오프라인 환경에서 **렌더링 불가**. Phase 1에서는 허용하되, 이후 로컬 번들링 필요.
-
-- markdown-it v14.1.0
-- markdown-it-task-lists v2.1.1
-- KaTeX v0.16.11
-- Mermaid v11.12.0
-
-#### Issue #6: 다크 모드 Mermaid 테마
-`mermaid.initialize({ theme: 'default' })` 고정. `prefers-color-scheme: dark`일 때 `theme: 'dark'`로 전환하는 로직 없음.
-
-#### Issue #7: Strikethrough 미설정
-markdown-it의 strikethrough는 기본 비활성. `{ breaks: false }` 설정은 있으나 strikethrough enable 옵션이 명시적으로 없음. (markdown-it v14에서는 기본 활성일 수 있으나 확인 필요)
-
-### LOW - 향후 개선
-
-#### Issue #8: 에러 핸들링
-- `Bundle.module.url()` 실패 시 무시됨 (빈 화면)
-- 파일 인코딩이 UTF-8이 아닌 경우 처리 없음
-- 대용량 파일에 대한 보호 없음
-
-#### Issue #9: 앱 메타데이터 부족
-- Info.plist 없음 (UTType 선언, 파일 연결)
-- 앱 아이콘 없음
-- About 다이얼로그 없음
-- 윈도우 최소/최대 크기 제약이 `frame(minWidth:minHeight:)`만으로 설정
-
-#### Issue #10: SwiftUI 생명주기
-- `@State`로 `FileWatcher`를 관리하면 SwiftUI 뷰 재생성 시 문제 가능
-- `@StateObject` + ObservableObject 패턴이 더 적합할 수 있음
-
----
-
-## 5. 코드 품질 메트릭
-
-| 항목 | 상태 | 비고 |
-|------|------|------|
-| `swift build` | PASS | 경고 없이 빌드 성공 |
-| 코드 구조 | GOOD | 관심사 분리 잘 됨 (App/Views/Models/Resources) |
-| 네이밍 | GOOD | Swift 컨벤션 준수 (PascalCase 타입, camelCase 변수) |
-| JS 인젝션 안전성 | GOOD | JSONEncoder 사용하여 XSS 방지 |
-| 메모리 관리 | OK | Coordinator의 webView가 weak ref |
-| 테스트 | NONE | 테스트 코드 없음 |
-| 문서화 | OK | CLAUDE.md 있으나 코드 주석 최소 |
-
----
-
-## 6. Phase 1→2 이행 결과
-
-### 해결됨
-1. [x] highlight.js 추가 및 코드 하이라이팅 (f75e661)
-2. [x] FileWatcher 연결 (이미 구현되어 있었음)
-3. [x] Refresh 버튼 + Cmd+O/Cmd+R (이미 구현되어 있었음)
-4. [x] Mermaid 다크 모드 테마 전환 (f75e661)
-5. [x] HSplitView 에디터 + 프리뷰 (764b28d)
-6. [x] 디바운스된 실시간 프리뷰 400ms (764b28d)
-7. [x] Save/SaveAs/New 파일 작업 (764b28d)
-
-### 미해결 (Phase 3+ 이후)
-- [ ] strikethrough 동작 확인
-- [ ] `Bundle.module.url()` 실패 시 fallback UI
-- [ ] 에디터 마크다운 구문 하이라이팅
-- [ ] 스크롤 동기화 (에디터 ↔ 프리뷰)
-
-## 남은 작업 (Future)
-
-### Quick Look Extension
-- .appex 번들 형태 (macOS 15+ 필수)
-- QLPreviewingController 프로토콜 구현
-- preview.html + vendor/ 렌더러 재사용
-- 별도 Xcode 프로젝트 또는 타겟 필요 (SPM은 app extension 미지원)
-
-### Polish
-- 테마 선택 (GitHub Light/Dark, Dracula 등)
-- 환경설정 패널 (폰트 크기, 테마, 에디터 설정)
-- 앱 아이콘 및 About 다이얼로그
-- 스크롤 동기화 (에디터 ↔ 프리뷰)
-- 에디터 줄번호 표시
-- 성능 최적화 (대용량 파일)
-- 탭 지원 (다중 파일)
-- 최근 파일 목록
-
----
-
-## 7. 기술 스택 요약
-
-| 컴포넌트 | 라이브러리 | 버전 | 로드 방식 |
-|----------|-----------|------|-----------|
-| 앱 프레임워크 | SwiftUI | macOS 14+ | 네이티브 |
-| 웹뷰 | WKWebView (WebKit) | 시스템 | 네이티브 |
-| 마크다운 파서 | markdown-it | 14.1.0 | CDN |
-| 체크리스트 | markdown-it-task-lists | 2.1.1 | CDN |
-| 수식 | KaTeX | 0.16.11 | CDN |
-| 다이어그램 | Mermaid | 11.12.0 | CDN |
-| 코드 하이라이팅 | highlight.js | **미포함** | - |
-
----
-
-## 8. 실행 방법
-
-```bash
-cd markdown-viewer
-swift build
-swift run
-```
-
-또는 Xcode에서:
-```bash
-open Package.swift  # Xcode에서 프로젝트 열기
-```
+- Version lives once, as `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in
+  `project.yml`. Both `Info.plist` files are generated from it by xcodegen — do
+  not edit them by hand.
+- `scripts/update-cask.sh <dmg>` regenerates the Homebrew cask, reading the
+  version from `project.yml` and the app name from the DMG.
+- `scripts/validate-dmg.sh` checks a built DMG before release.
+- CI (`.github/workflows/ci.yml`) runs `swift build`, `swift test`, and an
+  xcodegen + xcodebuild Release build on every push and pull request.
