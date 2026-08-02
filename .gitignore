@@ -25,3 +25,4 @@ Package.resolved
 # IDE
 *.idea/
 *.vscode/
+.vercel

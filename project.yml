@@ -13,11 +13,15 @@ settings:
     # Single source of truth for the version. Both Info.plists are generated
     # from this file by xcodegen and reference these as build settings, so this
     # is the only place a release bump needs to touch.
-    MARKETING_VERSION: "0.6.0"
-    CURRENT_PROJECT_VERSION: "11"
+    MARKETING_VERSION: "0.6.1"
+    CURRENT_PROJECT_VERSION: "12"
   configs:
     Release:
       CODE_SIGN_INJECT_BASE_ENTITLEMENTS: false
+      # Shipped builds are universal. Intel Macs run macOS 14 and 15, and an
+      # arm64-only binary refuses to launch there with nothing but a Finder
+      # error. Debug builds stay single-arch so local iteration is quick.
+      ARCHS: arm64 x86_64
 
 targets:
   MarkdownPrism:

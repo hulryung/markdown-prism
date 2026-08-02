@@ -68,6 +68,8 @@ xcodebuild \
     CODE_SIGN_STYLE=Manual \
     CODE_SIGN_IDENTITY="$SIGN_IDENTITY" \
     OTHER_CODE_SIGN_FLAGS="--timestamp" \
+    ARCHS="arm64 x86_64" \
+    ONLY_ACTIVE_ARCH=NO \
     build
 
 BUILT_APP="$DERIVED/Build/Products/Release/$APP_NAME"
@@ -99,6 +101,24 @@ do
     esac
 done
 echo "Secure timestamp present on app and extension"
+
+# The project asks for both architectures, but a plain build still comes out
+# arm64-only unless ARCHS is forced on the command line above. Confirm rather
+# than trust: an arm64-only release will not launch on an Intel Mac at all.
+for binary in \
+    "$BUILT_APP/Contents/MacOS/MarkdownPrism" \
+    "$BUILT_APP/Contents/PlugIns/MarkdownPrismQuickLook.appex/Contents/MacOS/MarkdownPrismQuickLook"
+do
+    slices=$(lipo -archs "$binary")
+    case "$slices" in
+        *arm64*x86_64*|*x86_64*arm64*) ;;
+        *)
+            echo "Error: $(basename "$binary") is $slices, not universal"
+            exit 1
+            ;;
+    esac
+done
+echo "Universal binary: app and extension carry arm64 and x86_64"
 
 # The app is notarized and stapled before it goes into the DMG, so the ticket
 # travels inside the bundle. Stapling only the DMG leaves the installed app
