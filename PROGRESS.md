@@ -80,8 +80,10 @@ Tests/MarkdownPrismTests/
   not edit them by hand.
 - `scripts/build-dmg.sh` builds and signs the Release app and packages
   `build/MarkdownPrism-<version>.dmg`. Set `NOTARY_PROFILE` to a notarytool
-  keychain profile to notarize and staple in the same run; without it the DMG
-  is signed but Gatekeeper rejects it on other Macs.
+  keychain profile to notarize and staple; without it the DMG is signed but
+  Gatekeeper rejects it on other Macs. Two submissions run: the app is
+  notarized and stapled before packaging so the ticket ships inside the
+  bundle, then the DMG is notarized and stapled as well.
 - `scripts/validate-dmg.sh <dmg>` checks the app bundle name inside the DMG.
 - `scripts/update-cask.sh <dmg>` regenerates the Homebrew cask, reading the
   version from `project.yml` and the app name from the DMG.

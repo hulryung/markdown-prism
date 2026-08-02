@@ -10,8 +10,9 @@
 # Environment:
 #   SIGN_IDENTITY    codesign identity (default: the Developer ID Application
 #                    identity in the keychain)
-#   NOTARY_PROFILE   notarytool keychain profile. When set, the DMG is
-#                    submitted for notarization and stapled. Create one with:
+#   NOTARY_PROFILE   notarytool keychain profile. When set, the app and then
+#                    the DMG are notarized and stapled — two submissions, so
+#                    expect several minutes. Create one with:
 #                      xcrun notarytool store-credentials <profile> \
 #                        --apple-id <id> --team-id <team> --password <app-specific-password>
 #
@@ -99,6 +100,24 @@ do
 done
 echo "Secure timestamp present on app and extension"
 
+# The app is notarized and stapled before it goes into the DMG, so the ticket
+# travels inside the bundle. Stapling only the DMG leaves the installed app
+# without one, and Gatekeeper then has to reach Apple to check it — which fails
+# on a machine that is offline the first time the app runs.
+if [ -n "${NOTARY_PROFILE:-}" ]; then
+    APP_ZIP="$OUT_DIR/MarkdownPrism-$VERSION-app.zip"
+    rm -f "$APP_ZIP"
+
+    echo "==> Notarizing app"
+    ditto -c -k --keepParent "$BUILT_APP" "$APP_ZIP"
+    xcrun notarytool submit "$APP_ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
+    rm -f "$APP_ZIP"
+
+    echo "==> Stapling app"
+    xcrun stapler staple "$BUILT_APP"
+    xcrun stapler validate "$BUILT_APP"
+fi
+
 echo "==> Staging"
 cp -R "$BUILT_APP" "$STAGING/$APP_NAME"
 ln -s /Applications "$STAGING/Applications"
@@ -113,17 +132,18 @@ hdiutil create \
 rm -rf "$STAGING"
 
 if [ -n "${NOTARY_PROFILE:-}" ]; then
-    echo "==> Notarizing"
+    # A second submission: a ticket for the app does not cover the disk image,
+    # and stapler can only staple an artifact that was itself submitted.
+    echo "==> Notarizing DMG"
     xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
-    echo "==> Stapling"
+    echo "==> Stapling DMG"
     xcrun stapler staple "$DMG_PATH"
     xcrun stapler validate "$DMG_PATH"
 else
     echo
     echo "Not notarized (NOTARY_PROFILE unset). Gatekeeper will reject this DMG"
-    echo "on other Macs until you run:"
-    echo "  xcrun notarytool submit \"$DMG_PATH\" --keychain-profile <profile> --wait"
-    echo "  xcrun stapler staple \"$DMG_PATH\""
+    echo "on other Macs. Re-run with NOTARY_PROFILE set rather than notarizing"
+    echo "the DMG by hand — the app inside has to be stapled before packaging."
 fi
 
 echo
