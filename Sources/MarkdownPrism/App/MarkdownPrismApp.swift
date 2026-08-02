@@ -10,11 +10,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #endif
 
-        // Delayed rather than immediate: a document opened at launch registers
-        // after this point, and creating the welcome document too early would
-        // leave a stray window alongside the file the user actually opened.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [self] in
-            openWelcomeDocumentIfNeeded()
+        // Created here, before SwiftUI gets the chance to put its Open panel on
+        // screen. AppKit says outright whether the launch came with a document,
+        // so this needs no delay and no guessing from document counts.
+        let isDefaultLaunch = notification
+            .userInfo?[NSApplication.launchIsDefaultUserInfoKey] as? Bool ?? true
+        if isDefaultLaunch {
+            openWelcomeDocument()
         }
 
         // Prompt to set as default Markdown app on first launch
@@ -27,7 +29,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// with nothing to open, and never consults the AppKit delegate methods for
     /// untitled files. Creating the document here is what brings the app up on
     /// the welcome document instead.
-    private func openWelcomeDocumentIfNeeded() {
+    private func openWelcomeDocument() {
         guard NSDocumentController.shared.documents.isEmpty else { return }
         WelcomeDocument.armForNextDocument()
         NSDocumentController.shared.newDocument(nil)
