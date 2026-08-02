@@ -2,19 +2,19 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://prism.huconn.xyz/</loc>
+    <loc>https://prism.huconn.com/</loc>
     <lastmod>2026-08-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://prism.huconn.xyz/" />
-    <xhtml:link rel="alternate" hreflang="ko" href="https://prism.huconn.xyz/ko.html" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://prism.huconn.com/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://prism.huconn.com/ko.html" />
   </url>
   <url>
-    <loc>https://prism.huconn.xyz/ko.html</loc>
+    <loc>https://prism.huconn.com/ko.html</loc>
     <lastmod>2026-08-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://prism.huconn.xyz/" />
-    <xhtml:link rel="alternate" hreflang="ko" href="https://prism.huconn.xyz/ko.html" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://prism.huconn.com/" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://prism.huconn.com/ko.html" />
   </url>
 </urlset>
