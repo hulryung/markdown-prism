@@ -5,6 +5,7 @@ struct ContentView: View {
     @Binding var document: MarkdownFileDocument
     let fileURL: URL?
 
+    @ObservedObject private var settings = AppSettings.shared
     @AppStorage("zoomScale") private var zoomScale = ZoomState.defaultScale
     @AppStorage("useFullWidth") private var useFullWidth = false
     @State private var previewText = ""
@@ -134,7 +135,8 @@ struct ContentView: View {
     private var editorPane: some View {
         EditorView(
             text: $document.text,
-            fontSize: zoomState.editorFontSize,
+            fontSize: settings.editorFontSize * zoomState.zoomScale,
+            fontFamily: settings.editorFontName,
             searchText: activeSearchText,
             searchRevision: searchRevision,
             isRegex: isRegex,
@@ -155,6 +157,8 @@ struct ContentView: View {
             searchRevision: searchRevision,
             isRegex: isRegex,
             useFullWidth: useFullWidth,
+            fontStack: settings.previewFontStack,
+            fontSize: settings.previewFontSize,
             scrollSync: scrollSync,
             fileURL: fileURL,
             onOpenFile: { url in open(url) },

@@ -19,6 +19,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             openWelcomeDocument()
         }
 
+        // The saved theme has to land before the first window draws, or the app
+        // flashes the system appearance and then corrects itself.
+        AppSettings.shared.applyAppearance()
+
         // Prompt to set as default Markdown app on first launch
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             DefaultAppHelper.promptIfFirstLaunch()
@@ -66,6 +70,10 @@ struct MarkdownPrismApp: App {
                 }
             }
             EditorCommands()
+        }
+
+        Settings {
+            SettingsView(settings: AppSettings.shared)
         }
     }
 }

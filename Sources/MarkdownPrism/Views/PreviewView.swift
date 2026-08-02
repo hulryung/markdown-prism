@@ -8,6 +8,8 @@ struct PreviewView: NSViewRepresentable {
     let searchRevision: Int
     let isRegex: Bool
     let useFullWidth: Bool
+    let fontStack: String
+    let fontSize: CGFloat
     let scrollSync: ScrollSyncBus
     var fileURL: URL?
     var onOpenFile: ((URL) -> Void)?
@@ -32,6 +34,7 @@ struct PreviewView: NSViewRepresentable {
         context.coordinator.pendingSearchRevision = searchRevision
         context.coordinator.pendingIsRegex = isRegex
         context.coordinator.pendingFullWidth = useFullWidth
+        context.coordinator.pendingTypography = Typography(stack: fontStack, size: fontSize)
         context.coordinator.fileURL = fileURL
         context.coordinator.onOpenFile = onOpenFile
         context.coordinator.onSearchResults = onSearchResults
@@ -68,6 +71,7 @@ struct PreviewView: NSViewRepresentable {
         c.pendingSearchRevision = searchRevision
         c.pendingIsRegex = isRegex
         c.pendingFullWidth = useFullWidth
+        c.pendingTypography = Typography(stack: fontStack, size: fontSize)
         c.fileURL = fileURL
         c.onOpenFile = onOpenFile
         c.onSearchResults = onSearchResults
@@ -87,6 +91,8 @@ struct PreviewView: NSViewRepresentable {
         var pendingSearchRevision = 0
         var pendingIsRegex = false
         var pendingFullWidth = false
+        var pendingTypography = Typography(stack: "", size: 16)
+        private var appliedTypography: Typography?
         private var appliedFullWidth: Bool?
         private var appliedSearchText: String?
         private var appliedSearchRevision = 0
@@ -112,6 +118,7 @@ struct PreviewView: NSViewRepresentable {
             isLoaded = true
             renderedMarkdown = ""
             appliedSearchText = nil
+            appliedTypography = nil
             sync()
         }
 
@@ -147,6 +154,7 @@ struct PreviewView: NSViewRepresentable {
             guard isLoaded else { return }
             applyZoomIfNeeded()
             applyFullWidthIfNeeded()
+            applyTypographyIfNeeded()
             let didRender = renderIfNeeded()
             if didRender { appliedSearchText = nil }
             searchIfNeeded()
@@ -157,6 +165,18 @@ struct PreviewView: NSViewRepresentable {
             guard pendingFullWidth != appliedFullWidth else { return }
             appliedFullWidth = pendingFullWidth
             webView.evaluateJavaScript("window.setFullWidth(\(pendingFullWidth));") { _, _ in }
+        }
+
+        private func applyTypographyIfNeeded() {
+            guard let webView else { return }
+            guard pendingTypography != appliedTypography else { return }
+            appliedTypography = pendingTypography
+
+            guard let encoded = try? JSONEncoder().encode(pendingTypography.stack),
+                  let stack = String(data: encoded, encoding: .utf8) else { return }
+            webView.evaluateJavaScript(
+                "window.setTypography(\(stack), \(pendingTypography.size));"
+            ) { _, _ in }
         }
 
         private func applyZoomIfNeeded() {
@@ -246,6 +266,12 @@ struct PreviewView: NSViewRepresentable {
             print("Ignored link click with unsupported scheme: \(href)")
         }
     }
+}
+
+/// The preview's body face and base size, as chosen in Settings.
+struct Typography: Equatable {
+    var stack: String
+    var size: CGFloat
 }
 
 /// Weak wrapper to avoid retain cycle between WKUserContentController and Coordinator.

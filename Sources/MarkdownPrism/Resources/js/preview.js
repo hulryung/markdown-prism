@@ -389,6 +389,23 @@ document.addEventListener('DOMContentLoaded', function () {
     return scrollToFindMatch((_findCurrentIndex - 1 + _findMatches.length) % _findMatches.length);
   }
 
+  // --- Typography ---
+  // The app sets these from Settings; leaving either blank restores the
+  // stylesheet's own default rather than writing an empty value.
+  window.setTypography = function (family, sizePx) {
+    var root = document.documentElement;
+    if (family) {
+      root.style.setProperty('--body-font', family);
+    } else {
+      root.style.removeProperty('--body-font');
+    }
+    if (sizePx) {
+      root.style.setProperty('--body-size', sizePx + 'px');
+    } else {
+      root.style.removeProperty('--body-size');
+    }
+  };
+
   // --- Content width toggle ---
   window.setFullWidth = function(enabled) {
     var content = document.getElementById('content');

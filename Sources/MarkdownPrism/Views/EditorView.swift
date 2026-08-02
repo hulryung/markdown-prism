@@ -4,6 +4,7 @@ import AppKit
 struct EditorView: NSViewRepresentable {
     @Binding var text: String
     let fontSize: CGFloat
+    let fontFamily: String
     let searchText: String
     let searchRevision: Int
     let isRegex: Bool
@@ -65,8 +66,11 @@ struct EditorView: NSViewRepresentable {
         guard let textView = scrollView.documentView as? NSTextView else { return }
         context.coordinator.parent = self
 
-        let fontSizeChanged = context.coordinator.appliedFontSize != fontSize
+        let fontChanged = context.coordinator.appliedFontSize != fontSize
+            || context.coordinator.appliedFontFamily != fontFamily
         context.coordinator.highlighter.fontSize = fontSize
+        context.coordinator.highlighter.fontFamily = fontFamily
+        let fontSizeChanged = fontChanged
         if fontSizeChanged {
             context.coordinator.applyTypingAttributes(to: textView)
             context.coordinator.applyGutterFont(to: textView, fontSize: fontSize)
@@ -98,6 +102,7 @@ struct EditorView: NSViewRepresentable {
             }
         }
         context.coordinator.appliedFontSize = fontSize
+        context.coordinator.appliedFontFamily = fontFamily
         context.coordinator.handleReplaceIfNeeded(in: textView)
         context.coordinator.updateSearchHighlights(in: textView)
         context.coordinator.isEditingFromTextView = false
@@ -144,6 +149,7 @@ struct EditorView: NSViewRepresentable {
         weak var textView: NSTextView?
         let highlighter: MarkdownHighlighter
         var appliedFontSize: CGFloat
+        var appliedFontFamily = ""
         private var highlightWork: DispatchWorkItem?
         private static let highlightDebounceInterval: TimeInterval = 0.15
         private var textRevision = 0
@@ -153,7 +159,8 @@ struct EditorView: NSViewRepresentable {
         init(_ parent: EditorView) {
             self.parent = parent
             self.appliedFontSize = parent.fontSize
-            highlighter = MarkdownHighlighter(fontSize: parent.fontSize)
+            highlighter = MarkdownHighlighter(fontSize: parent.fontSize, fontFamily: parent.fontFamily)
+            appliedFontFamily = parent.fontFamily
         }
 
         deinit {

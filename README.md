@@ -20,7 +20,8 @@ A native macOS Markdown viewer & editor with live preview, Quick Look support, a
 - **Quick Look** — Preview `.md` files in Finder with spacebar
 - **File Watching** — Auto-refreshes when the file changes on disk
 - **Encoding Safe** — UTF-8, UTF-16/32 and Latin-1 files are saved as they were read
-- **Dark Mode** — Follows system appearance
+- **Themes** — Follow the system, or pin light or dark
+- **Fonts** — Pick the editor and preview faces and sizes in Settings
 
 Everything renders offline: the parser, highlighter, math and diagram libraries
 are all bundled in the app.

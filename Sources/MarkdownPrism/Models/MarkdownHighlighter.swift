@@ -3,20 +3,31 @@ import AppKit
 final class MarkdownHighlighter {
     var fontSize: CGFloat {
         didSet {
-            markdownRules = Self.makeMarkdownRules(fontSize: fontSize)
+            guard fontSize != oldValue else { return }
+            markdownRules = Self.makeMarkdownRules(fontSize: fontSize, family: fontFamily)
+        }
+    }
+
+    /// Empty means the system monospaced face. A named family is only used when
+    /// it resolves and is fixed-pitch, so an uninstalled font falls back rather
+    /// than throwing the editor's alignment out.
+    var fontFamily: String = "" {
+        didSet {
+            guard fontFamily != oldValue else { return }
+            markdownRules = Self.makeMarkdownRules(fontSize: fontSize, family: fontFamily)
         }
     }
 
     var baseFont: NSFont {
-        Self.makeBaseFont(fontSize: fontSize)
+        Self.makeBaseFont(fontSize: fontSize, family: fontFamily)
     }
 
     var boldFont: NSFont {
-        Self.makeBoldFont(fontSize: fontSize)
+        Self.makeBoldFont(fontSize: fontSize, family: fontFamily)
     }
 
     var headerFont: NSFont {
-        Self.makeHeaderFont(fontSize: fontSize)
+        Self.makeHeaderFont(fontSize: fontSize, family: fontFamily)
     }
 
     private let baseColor = NSColor.labelColor
@@ -35,40 +46,56 @@ final class MarkdownHighlighter {
     /// which forces the first incremental call through the full path.
     private var lastFenceMarkerCount: Int?
 
-    init(fontSize: CGFloat = ZoomState.baseEditorFontSize) {
+    init(fontSize: CGFloat = ZoomState.baseEditorFontSize, fontFamily: String = "") {
         self.fontSize = fontSize
+        self.fontFamily = fontFamily
         codeBlockPattern = try? NSRegularExpression(pattern: "^```[\\s\\S]*?^```", options: .anchorsMatchLines)
         inlineCodePattern = try? NSRegularExpression(pattern: "`[^`\n]+`", options: [])
-        markdownRules = Self.makeMarkdownRules(fontSize: fontSize)
+        markdownRules = Self.makeMarkdownRules(fontSize: fontSize, family: fontFamily)
     }
 
-    private static func makeBaseFont(fontSize: CGFloat) -> NSFont {
-        NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+    private static func makeBaseFont(fontSize: CGFloat, family: String) -> NSFont {
+        resolved(family: family, size: fontSize)
+            ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
     }
 
-    private static func makeBoldFont(fontSize: CGFloat) -> NSFont {
-        NSFont.monospacedSystemFont(ofSize: fontSize, weight: .bold)
+    private static func makeBoldFont(fontSize: CGFloat, family: String) -> NSFont {
+        guard let base = resolved(family: family, size: fontSize) else {
+            return NSFont.monospacedSystemFont(ofSize: fontSize, weight: .bold)
+        }
+        return NSFontManager.shared.convert(base, toHaveTrait: .boldFontMask)
     }
 
-    private static func makeHeaderFont(fontSize: CGFloat) -> NSFont {
-        NSFont.monospacedSystemFont(ofSize: fontSize, weight: .bold)
+    private static func makeHeaderFont(fontSize: CGFloat, family: String) -> NSFont {
+        makeBoldFont(fontSize: fontSize, family: family)
     }
 
-    private static func makeItalicFont(fontSize: CGFloat) -> NSFont {
+    private static func makeItalicFont(fontSize: CGFloat, family: String) -> NSFont {
+        if let base = resolved(family: family, size: fontSize) {
+            let italic = NSFontManager.shared.convert(base, toHaveTrait: .italicFontMask)
+            // convert() hands back the original when the family has no italic.
+            if italic != base { return italic }
+        }
+
         let italicDescriptor = NSFontDescriptor(fontAttributes: [
             .family: "Menlo",
             .face: "Italic"
         ])
-
         return NSFont(descriptor: italicDescriptor, size: fontSize)
             ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
     }
 
-    private static func makeMarkdownRules(fontSize: CGFloat) -> [HighlightRule] {
+    /// nil for the system face, or when the named family is missing.
+    private static func resolved(family: String, size: CGFloat) -> NSFont? {
+        guard !family.isEmpty else { return nil }
+        return NSFont(name: family, size: size)
+    }
+
+    private static func makeMarkdownRules(fontSize: CGFloat, family: String) -> [HighlightRule] {
         var rules: [HighlightRule] = []
-        let boldFont = makeBoldFont(fontSize: fontSize)
-        let headerFont = makeHeaderFont(fontSize: fontSize)
-        let italicFont = makeItalicFont(fontSize: fontSize)
+        let boldFont = makeBoldFont(fontSize: fontSize, family: family)
+        let headerFont = makeHeaderFont(fontSize: fontSize, family: family)
+        let italicFont = makeItalicFont(fontSize: fontSize, family: family)
 
         // Headers
         if let regex = try? NSRegularExpression(pattern: "^#{1,6}\\s.+$", options: .anchorsMatchLines) {

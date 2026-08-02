@@ -46,8 +46,10 @@ Native shell, web renderer:
 ```
 Sources/MarkdownPrism/
   App/         MarkdownPrismApp, AppDelegate, menu commands
-  Views/       ContentView, EditorView, PreviewView, FindBarView, LineNumberGutter
-  Models/      MarkdownFileDocument, MarkdownDocument (decoding), TextFileFormat,
+  Views/       ContentView, EditorView, PreviewView, FindBarView, LineNumberGutter,
+               SettingsView
+  Models/      MarkdownFileDocument, MarkdownDocument (decoding), AppSettings,
+               TextFileFormat,
                FileWatcher, MarkdownHighlighter, ZoomState, LineIndex, ScrollSync,
                DefaultAppHelper
   Resources/   preview.html, preview-quicklook.html, js/, css/, vendor/
@@ -69,13 +71,14 @@ Tests/MarkdownPrismTests/
 - File watching that reverts the document when the file changes underneath it,
   prompting first if there are unsaved edits
 - Saves preserve the encoding the file was read in
+- Settings for theme (system/light/dark) and editor and preview fonts
 - Zoom, full-width toggle, internal heading links, "set as default app"
 
 ## Open items
 
 | Area | Item |
 |------|------|
-| UI | No preferences panel (theme, font), no localization — the app is English-only while the site ships a Korean page. |
+| UI | No localization — the app is English-only while the site ships a Korean page. |
 | Testing | UI behaviour (menus, window lifecycle, drag and drop) is still only checked by hand; the renderer and the model layer are covered. |
 
 ## Release
