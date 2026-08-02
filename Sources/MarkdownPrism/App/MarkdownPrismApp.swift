@@ -1,20 +1,7 @@
 import SwiftUI
 
-class OpenFileState: ObservableObject {
-    @Published var pendingURL: URL?
-    @Published var isModified = false
-    var saveHandler: (() -> Bool)?
-}
-
-class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
-    let openFileState = OpenFileState()
-    private var delegateProxies: [ObjectIdentifier: WindowDelegateProxy] = [:]
-
+class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Ensure the app appears as a regular app with Dock icon and menu bar
-        NSApplication.shared.setActivationPolicy(.regular)
-        NSApplication.shared.activate(ignoringOtherApps: true)
-
         // Load app icon from bundled resource (xcassets not available in SPM builds)
         #if SWIFT_PACKAGE
         if let iconURL = Bundle.module.url(forResource: "AppIcon", withExtension: "png", subdirectory: "Resources"),
@@ -23,119 +10,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         #endif
 
-        // Open file passed as command-line argument
-        let args = ProcessInfo.processInfo.arguments
-        if args.count > 1 {
-            let path = args[1]
-            let url = URL(fileURLWithPath: path)
-            if FileManager.default.fileExists(atPath: url.path) {
-                openFileState.pendingURL = url
-            }
-        }
-
-        // Wrap SwiftUI's window delegate with a forwarding proxy so we can
-        // intercept windowShouldClose without stealing scene lifecycle
-        // handling from SwiftUI. Windows created at any time are covered.
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleWindowDidBecomeKey(_:)),
-            name: NSWindow.didBecomeKeyNotification,
-            object: nil
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleWindowWillClose(_:)),
-            name: NSWindow.willCloseNotification,
-            object: nil
-        )
-
         // Prompt to set as default Markdown app on first launch
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             DefaultAppHelper.promptIfFirstLaunch()
         }
-    }
-
-    func application(_ application: NSApplication, open urls: [URL]) {
-        guard let url = urls.first else { return }
-        openFileState.pendingURL = url
-    }
-
-    // MARK: - Window Delegate Proxying
-
-    @objc private func handleWindowDidBecomeKey(_ notification: Notification) {
-        guard let window = notification.object as? NSWindow else { return }
-        installProxyIfNeeded(on: window)
-    }
-
-    @objc private func handleWindowWillClose(_ notification: Notification) {
-        guard let window = notification.object as? NSWindow else { return }
-        delegateProxies.removeValue(forKey: ObjectIdentifier(window))
-    }
-
-    private func installProxyIfNeeded(on window: NSWindow) {
-        guard window.styleMask.contains(.titled), !(window is NSPanel) else { return }
-        if window.delegate is WindowDelegateProxy { return }
-
-        let proxy = WindowDelegateProxy()
-        proxy.original = window.delegate
-        proxy.appDelegate = self
-        window.delegate = proxy
-        delegateProxies[ObjectIdentifier(window)] = proxy
-    }
-
-    // MARK: - NSWindowDelegate
-
-    func windowShouldClose(_ sender: NSWindow) -> Bool {
-        confirmSaveIfNeeded()
-    }
-
-    // MARK: - App Termination
-
-    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        confirmSaveIfNeeded() ? .terminateNow : .terminateCancel
-    }
-
-    fileprivate func confirmSaveIfNeeded() -> Bool {
-        guard openFileState.isModified else { return true }
-
-        let alert = NSAlert()
-        alert.messageText = "You have unsaved changes"
-        alert.informativeText = "Do you want to save your changes before closing?"
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Don't Save")
-        alert.addButton(withTitle: "Cancel")
-        alert.alertStyle = .warning
-
-        switch alert.runModal() {
-        case .alertFirstButtonReturn:
-            return openFileState.saveHandler?() ?? false
-        case .alertSecondButtonReturn:
-            return true
-        default:
-            return false
-        }
-    }
-}
-
-final class WindowDelegateProxy: NSObject, NSWindowDelegate {
-    weak var original: NSWindowDelegate?
-    weak var appDelegate: AppDelegate?
-
-    func windowShouldClose(_ sender: NSWindow) -> Bool {
-        guard appDelegate?.confirmSaveIfNeeded() ?? true else { return false }
-        if let original, original.responds(to: #selector(NSWindowDelegate.windowShouldClose(_:))) {
-            return original.windowShouldClose?(sender) ?? true
-        }
-        return true
-    }
-
-    override func responds(to aSelector: Selector!) -> Bool {
-        super.responds(to: aSelector) || (original?.responds(to: aSelector) ?? false)
-    }
-
-    override func forwardingTarget(for aSelector: Selector!) -> Any? {
-        if let original, original.responds(to: aSelector) { return original }
-        return super.forwardingTarget(for: aSelector)
     }
 }
 
@@ -144,11 +22,13 @@ struct MarkdownPrismApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        WindowGroup {
-            ContentView()
-                .environmentObject(appDelegate.openFileState)
+        // New, Open, Open Recent, Save, Save As, Duplicate, Rename, Revert, the
+        // unsaved-changes prompts, window tabs and per-document dirty state all
+        // come from the document architecture; only the commands below are the
+        // app's own.
+        DocumentGroup(newDocument: MarkdownFileDocument()) { file in
+            ContentView(document: file.$document, fileURL: file.fileURL)
         }
-        .defaultSize(width: 1200, height: 800)
         .commands {
             CommandGroup(after: .appInfo) {
                 Divider()
@@ -156,17 +36,12 @@ struct MarkdownPrismApp: App {
                     DefaultAppHelper.setAsDefault()
                 }
             }
-            FileCommands()
+            EditorCommands()
         }
     }
 }
 
-struct FileCommands: Commands {
-    @FocusedValue(\.newFileAction) var newFileAction
-    @FocusedValue(\.openFileAction) var openFileAction
-    @FocusedValue(\.openRecentAction) var openRecentAction
-    @FocusedValue(\.saveFileAction) var saveFileAction
-    @FocusedValue(\.saveAsFileAction) var saveAsFileAction
+struct EditorCommands: Commands {
     @FocusedValue(\.zoomInAction) var zoomInAction
     @FocusedValue(\.zoomOutAction) var zoomOutAction
     @FocusedValue(\.resetZoomAction) var resetZoomAction
@@ -175,49 +50,8 @@ struct FileCommands: Commands {
     @FocusedValue(\.findPreviousAction) var findPreviousAction
     @FocusedValue(\.dismissFindAction) var dismissFindAction
     @FocusedValue(\.showReplaceAction) var showReplaceAction
-    @ObservedObject private var recentDocuments = RecentDocumentsManager.shared
 
     var body: some Commands {
-        CommandGroup(replacing: .newItem) {
-            Button("New") {
-                newFileAction?()
-            }
-            .keyboardShortcut("n", modifiers: .command)
-
-            Button("Open...") {
-                openFileAction?()
-            }
-            .keyboardShortcut("o", modifiers: .command)
-
-            Menu("Open Recent") {
-                ForEach(recentDocuments.recentURLs, id: \.self) { url in
-                    Button(url.lastPathComponent) {
-                        openRecentAction?(url)
-                    }
-                }
-                if !recentDocuments.recentURLs.isEmpty {
-                    Divider()
-                }
-                Button("Clear Menu") {
-                    recentDocuments.clear()
-                }
-                .disabled(recentDocuments.recentURLs.isEmpty)
-            }
-        }
-
-        CommandGroup(after: .newItem) {
-            Button("Save") {
-                saveFileAction?()
-            }
-            .keyboardShortcut("s", modifiers: .command)
-            .disabled(saveFileAction == nil)
-
-            Button("Save As...") {
-                saveAsFileAction?()
-            }
-            .keyboardShortcut("s", modifiers: [.command, .shift])
-        }
-
         CommandGroup(after: .toolbar) {
             Button("Zoom In") {
                 zoomInAction?()
@@ -243,6 +77,7 @@ struct FileCommands: Commands {
                 findAction?()
             }
             .keyboardShortcut("f", modifiers: .command)
+            .disabled(findAction == nil)
 
             Button("Find Next") {
                 findNextAction?()
@@ -260,6 +95,7 @@ struct FileCommands: Commands {
                 showReplaceAction?()
             }
             .keyboardShortcut("f", modifiers: [.command, .option])
+            .disabled(showReplaceAction == nil)
 
             Button("Dismiss Find") {
                 dismissFindAction?()

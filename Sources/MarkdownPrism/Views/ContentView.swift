@@ -2,19 +2,16 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
-    @EnvironmentObject private var openFileState: OpenFileState
+    @Binding var document: MarkdownFileDocument
+    let fileURL: URL?
+
     @AppStorage("zoomScale") private var zoomScale = ZoomState.defaultScale
     @AppStorage("useFullWidth") private var useFullWidth = false
-    @State private var markdownText = ContentView.welcomeMarkdown
-    @State private var previewText = ContentView.welcomeMarkdown
-    @State private var fileURL: URL?
-    @State private var fileWatcher: FileWatcher?
-    @State private var scopedAccess: SecurityScopedAccess?
+    @State private var previewText = ""
     @State private var scrollSync = ScrollSyncBus()
-    @State private var fileFormat = TextFileFormat.utf8
+    @State private var fileWatcher: FileWatcher?
     @State private var showEditor = true
     @State private var debounceWork: DispatchWorkItem?
-    @State private var ignoreNextTextChange = false
     @State private var isSearchVisible = false
     @State private var searchText = ""
     @State private var searchMatchCount = 0
@@ -35,8 +32,6 @@ struct ContentView: View {
             .focusedSceneValue(\.dismissFindAction, isSearchVisible ? { dismissSearch() } : nil)
             .focusedSceneValue(\.showReplaceAction, { showReplace() })
     }
-
-
 
     @ViewBuilder
     private var findBar: some View {
@@ -81,26 +76,6 @@ struct ContentView: View {
                 .keyboardShortcut("e", modifiers: [.command, .shift])
             }
             ToolbarItem(placement: .automatic) {
-                Button(action: openFile) {
-                    Label("Open", systemImage: "doc")
-                }
-                .keyboardShortcut("o", modifiers: .command)
-            }
-            ToolbarItem(placement: .automatic) {
-                Button(action: { _ = saveFile() }) {
-                    Label("Save", systemImage: "square.and.arrow.down")
-                }
-                .keyboardShortcut("s", modifiers: .command)
-                .disabled(!openFileState.isModified)
-            }
-            ToolbarItem(placement: .automatic) {
-                Button(action: refreshFile) {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
-                .keyboardShortcut("r", modifiers: .command)
-                .disabled(fileURL == nil)
-            }
-            ToolbarItem(placement: .automatic) {
                 Button(action: { useFullWidth.toggle() }) {
                     Label(
                         useFullWidth ? "Fixed Width" : "Full Width",
@@ -120,58 +95,32 @@ struct ContentView: View {
                 .disabled(!zoomState.canZoomIn)
             }
         }
-        .navigationTitle(windowTitle)
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             handleDrop(providers)
         }
-        .onOpenURL { url in
-            requestOpen(url)
+        .onAppear {
+            scrollSync.isEnabled = showEditor
+            previewText = document.text
+            startWatchingFile()
         }
-        .onChange(of: openFileState.pendingURL) {
-            if let url = openFileState.pendingURL {
-                openFileState.pendingURL = nil
-                requestOpen(url)
-            }
+        .onChange(of: fileURL) {
+            // Save As, Rename and Move To all repoint the document.
+            startWatchingFile()
         }
         .onChange(of: showEditor) {
             // Nothing to follow along with while the editor is hidden.
             scrollSync.isEnabled = showEditor
         }
-        .onAppear {
-            scrollSync.isEnabled = showEditor
-            openFileState.saveHandler = { self.saveFile() }
-            if let url = openFileState.pendingURL {
-                openFileState.pendingURL = nil
-                requestOpen(url)
-            }
-        }
         .onDisappear {
-            fileWatcher?.stop()
             debounceWork?.cancel()
+            fileWatcher?.stop()
         }
-        .onChange(of: markdownText) {
-            if ignoreNextTextChange {
-                ignoreNextTextChange = false
-                return
-            }
-            openFileState.isModified = true
-            schedulePreviewUpdate(markdownText)
+        .onChange(of: document.text) {
+            schedulePreviewUpdate(document.text)
         }
-        .focusedSceneValue(\.newFileAction, { newFileAction() })
-        .focusedSceneValue(\.openFileAction, { openFile() })
-        .focusedSceneValue(\.openRecentAction, { url in requestOpen(url) })
-        .focusedSceneValue(\.saveFileAction, openFileState.isModified ? { _ = saveFile() } : nil)
-        .focusedSceneValue(\.saveAsFileAction, { _ = saveAsFile() })
         .focusedSceneValue(\.zoomInAction, zoomState.canZoomIn ? { zoomIn() } : nil)
         .focusedSceneValue(\.zoomOutAction, zoomState.canZoomOut ? { zoomOut() } : nil)
         .focusedSceneValue(\.resetZoomAction, zoomState.zoomScale == ZoomState.defaultScale ? nil : { resetZoom() })
-    }
-
-    private var windowTitle: String {
-        guard let name = fileURL?.lastPathComponent else {
-            return "Markdown Prism"
-        }
-        return openFileState.isModified ? "\(name) \u{2014} Edited" : name
     }
 
     private var zoomState: ZoomState {
@@ -184,7 +133,7 @@ struct ContentView: View {
 
     private var editorPane: some View {
         EditorView(
-            text: $markdownText,
+            text: $document.text,
             fontSize: zoomState.editorFontSize,
             searchText: activeSearchText,
             searchRevision: searchRevision,
@@ -208,22 +157,13 @@ struct ContentView: View {
             useFullWidth: useFullWidth,
             scrollSync: scrollSync,
             fileURL: fileURL,
-            onOpenFile: { url in requestOpen(url) },
+            onOpenFile: { url in open(url) },
             onSearchResults: { count, current in
                 searchMatchCount = count
                 searchCurrentMatch = current
             }
         )
         .frame(minWidth: 300)
-    }
-
-    private func setDocumentText(_ text: String, modified: Bool) {
-        debounceWork?.cancel()
-        debounceWork = nil
-        ignoreNextTextChange = (markdownText != text)
-        markdownText = text
-        previewText = text
-        openFileState.isModified = modified
     }
 
     private func zoomIn() {
@@ -281,208 +221,58 @@ struct ContentView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
     }
 
-    // MARK: - File Actions
+    // MARK: - External Changes
 
-    private func newFileAction() {
-        if openFileState.isModified {
-            guard confirmDiscardChanges() else { return }
-        }
+    /// The document system does not notice a file changing underneath it, so
+    /// the watcher stays and reloads through the document's own revert path —
+    /// which re-reads the file and clears the edited state, rather than writing
+    /// the new text in as if the user had typed it.
+    private func startWatchingFile() {
         fileWatcher?.stop()
         fileWatcher = nil
-        fileURL = nil
-        scopedAccess = nil
-        fileFormat = .utf8
-        setDocumentText("", modified: false)
-    }
 
-    private func openFile() {
-        if openFileState.isModified {
-            guard confirmDiscardChanges() else { return }
-        }
-
-        let panel = NSOpenPanel()
-        var contentTypes: [UTType] = [.plainText]
-        if let markdownType = UTType(filenameExtension: "md") {
-            contentTypes.insert(markdownType, at: 0)
-        }
-        panel.allowedContentTypes = contentTypes
-        panel.allowsMultipleSelection = false
-        panel.message = "Choose a Markdown file"
-
-        if panel.runModal() == .OK, let url = panel.url {
-            loadFile(url)
-        }
-    }
-
-    private func saveFile() -> Bool {
-        guard let fileURL else {
-            return saveAsFile()
-        }
-        return writeFile(to: fileURL)
-    }
-
-    private func saveAsFile() -> Bool {
-        let panel = NSSavePanel()
-        if let markdownType = UTType(filenameExtension: "md") {
-            panel.allowedContentTypes = [markdownType]
-        } else {
-            panel.allowedContentTypes = [.plainText]
-        }
-        panel.nameFieldStringValue = fileURL?.lastPathComponent ?? "Untitled.md"
-        panel.message = "Save Markdown file"
-
-        guard panel.runModal() == .OK, let url = panel.url else {
-            return false
-        }
-
-        guard writeFile(to: url) else {
-            return false
-        }
-
-        if url != fileURL {
-            fileURL = url
-            // The save panel grants access to the new URL for this session, so
-            // the token for the previously open document can be released.
-            scopedAccess = nil
-            startWatchingFile(at: url, forceRestart: true)
-        }
-
-        return true
-    }
-
-    private func writeFile(to url: URL) -> Bool {
-        let isWatchedURL = url == fileURL
-        if isWatchedURL {
-            fileWatcher?.stop()
-        }
-        do {
-            // Written in the encoding the file was read in. If the text has
-            // since grown characters that encoding cannot represent, fall back
-            // to UTF-8 and remember that, rather than refusing to save.
-            var data = fileFormat.encode(markdownText)
-            if data == nil {
-                fileFormat = .utf8
-                data = fileFormat.encode(markdownText)
+        guard let fileURL else { return }
+        fileWatcher = FileWatcher(url: fileURL) {
+            DispatchQueue.main.async {
+                reloadFromDisk(fileURL)
             }
-            guard let data else { throw MarkdownDocument.Error.unsupportedEncoding }
+        }
+        fileWatcher?.start()
+    }
 
-            try data.write(to: url, options: .atomic)
-            openFileState.isModified = false
-            if isWatchedURL {
-                startWatchingFile(at: url, forceRestart: true)
-            }
-            return true
-        } catch {
-            if isWatchedURL {
-                startWatchingFile(at: url, forceRestart: true)
-            }
+    private func reloadFromDisk(_ url: URL) {
+        guard self.fileURL == url,
+              let nsDocument = NSDocumentController.shared.document(for: url) else { return }
+
+        if nsDocument.isDocumentEdited {
             let alert = NSAlert()
-            alert.messageText = "Save Failed"
-            alert.informativeText = error.localizedDescription
+            alert.messageText = "The file was changed on disk"
+            alert.informativeText = "Reload and discard your unsaved changes?"
+            alert.addButton(withTitle: "Reload")
+            alert.addButton(withTitle: "Keep My Changes")
             alert.alertStyle = .warning
-            alert.runModal()
-            return false
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
+
+        // Failures are silent: the watcher also fires mid-replace, while the
+        // path is briefly gone, and the last good content should survive.
+        try? nsDocument.revert(
+            toContentsOf: url,
+            ofType: nsDocument.fileType ?? UTType.markdown.identifier
+        )
     }
 
-    private func confirmDiscardChanges() -> Bool {
-        let alert = NSAlert()
-        alert.messageText = "You have unsaved changes"
-        alert.informativeText = "Do you want to save your changes before continuing?"
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Don't Save")
-        alert.addButton(withTitle: "Cancel")
-        alert.alertStyle = .warning
-
-        let response = alert.runModal()
-        switch response {
-        case .alertFirstButtonReturn:
-            return saveFile()
-        case .alertSecondButtonReturn:
-            return true
-        default:
-            return false
-        }
-    }
-
-    private func requestOpen(_ url: URL) {
-        if openFileState.isModified {
-            guard confirmDiscardChanges() else { return }
-        }
-        loadFile(url)
-    }
-
-    /// - Parameter reportsFailure: when false, a failed read leaves the current
-    ///   document untouched and silent. Used for file-watcher reloads, which fire
-    ///   mid-replace while the path is briefly gone.
-    private func loadFile(_ url: URL, reportsFailure: Bool = true) {
-        let previousURL = fileURL
-        // Held only for the duration of the read unless the load succeeds, in
-        // which case it replaces the token of the previously open document.
-        let access = RecentDocumentsManager.shared.beginAccess(to: url)
-        do {
-            let document = try MarkdownDocument(fileURL: url)
-            setDocumentText(document.text, modified: false)
-            fileFormat = document.format
-            // On a watcher-driven reload of the same file, keep the token
-            // already held rather than replacing it with nothing.
-            if access != nil || previousURL != url {
-                scopedAccess = access
-            }
-            fileURL = url
-            startWatchingFile(at: url, forceRestart: previousURL != url)
-            RecentDocumentsManager.shared.addURL(url)
-        } catch {
-            // Leave the buffer and fileURL alone: overwriting them would point
-            // the editor at the previously open file while showing content the
-            // user never typed, and a later save would clobber that file.
-            guard reportsFailure else { return }
-
-            if !FileManager.default.fileExists(atPath: url.path) {
-                RecentDocumentsManager.shared.remove(url)
-            }
-
+    /// Opens a file in its own document window, which is also what gives the
+    /// sandbox access to it and adds it to Open Recent.
+    private func open(_ url: URL) {
+        NSDocumentController.shared.openDocument(withContentsOf: url, display: true) { _, _, error in
+            guard let error else { return }
             let alert = NSAlert()
             alert.messageText = "Could not open \u{201C}\(url.lastPathComponent)\u{201D}"
             alert.informativeText = error.localizedDescription
             alert.alertStyle = .warning
             alert.runModal()
         }
-    }
-
-    private func refreshFile() {
-        guard let fileURL else {
-            return
-        }
-        requestOpen(fileURL)
-    }
-
-    private func startWatchingFile(at url: URL, forceRestart: Bool) {
-        guard forceRestart || fileWatcher == nil else {
-            return
-        }
-
-        fileWatcher?.stop()
-        fileWatcher = FileWatcher(url: url) {
-            DispatchQueue.main.async {
-                guard self.fileURL == url else {
-                    return
-                }
-                if self.openFileState.isModified {
-                    let alert = NSAlert()
-                    alert.messageText = "The file was changed on disk"
-                    alert.informativeText = "Reload and discard your unsaved changes?"
-                    alert.addButton(withTitle: "Reload")
-                    alert.addButton(withTitle: "Keep My Changes")
-                    alert.alertStyle = .warning
-                    guard alert.runModal() == .alertFirstButtonReturn else {
-                        return
-                    }
-                }
-                self.loadFile(url, reportsFailure: false)
-            }
-        }
-        fileWatcher?.start()
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
@@ -505,7 +295,7 @@ struct ContentView: View {
             }
 
             DispatchQueue.main.async {
-                self.requestOpen(url)
+                open(url)
             }
         }
 
@@ -513,143 +303,12 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Welcome Demo Content
-
-extension ContentView {
-    static let welcomeMarkdown = """
-    # Welcome to Markdown Prism
-
-    A native macOS Markdown viewer & editor with **live preview**.
-
-    ---
-
-    ## Table of Contents
-
-    - [Features](#features)
-    - [Text Formatting](#text-formatting)
-    - [Links & Images](#links--images)
-    - [Code Blocks](#code-blocks)
-    - [Math (KaTeX)](#math-katex)
-    - [Mermaid Diagrams](#mermaid-diagrams)
-
-    ## Features
-
-    ### Text Formatting
-
-    **Bold**, *Italic*, ~~Strikethrough~~, and `inline code`.
-
-    > Blockquotes are supported too.
-    > They can span multiple lines.
-
-    ### Links & Images
-
-    Visit [GitHub](https://github.com) or check the [Markdown Guide](https://www.markdownguide.org).
-
-    ### Lists
-
-    - Unordered item 1
-    - Unordered item 2
-      - Nested item
-
-    1. Ordered item 1
-    2. Ordered item 2
-
-    ### Task Lists
-
-    - [x] GFM Markdown rendering
-    - [x] Syntax highlighting
-    - [x] LaTeX math support
-    - [x] Mermaid diagrams
-    - [ ] Quick Look extension
-
-    ### Tables
-
-    | Feature | Status | Notes |
-    |:--------|:------:|------:|
-    | GFM | Done | Tables, task lists |
-    | KaTeX | Done | Inline & block math |
-    | Mermaid | Done | Flowcharts & more |
-    | highlight.js | Done | 180+ languages |
-
-    ### Code Blocks
-
-    ```swift
-    // Swift example
-    struct MarkdownPrism: App {
-        var body: some Scene {
-            WindowGroup {
-                ContentView()
-            }
-        }
-    }
-    ```
-
-    ```python
-    # Python example
-    def fibonacci(n):
-        a, b = 0, 1
-        for _ in range(n):
-            a, b = b, a + b
-        return a
-
-    print(fibonacci(10))  # 55
-    ```
-
-    ### Math (KaTeX)
-
-    Inline math: $E = mc^2$, $\\alpha + \\beta = \\gamma$
-
-    Block math:
-
-    $$
-    \\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}
-    $$
-
-    $$
-    \\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}
-    $$
-
-    ### Mermaid Diagrams
-
-    ```mermaid
-    graph LR
-        A[Markdown] --> B[markdown-it]
-        B --> C[HTML]
-        C --> D[highlight.js]
-        C --> E[KaTeX]
-        C --> F[Mermaid]
-        D --> G[Rendered Preview]
-        E --> G
-        F --> G
-    ```
-
-    ---
-
-    **Tip:** Open a `.md` file with **Cmd+O** or drag & drop it onto this window.
-    """
-}
-
 // MARK: - Focused Values for Menu Commands
 
-private struct NewFileActionKey: FocusedValueKey {
-    typealias Value = () -> Void
-}
 
-private struct OpenFileActionKey: FocusedValueKey {
-    typealias Value = () -> Void
-}
 
-private struct OpenRecentActionKey: FocusedValueKey {
-    typealias Value = (URL) -> Void
-}
 
-private struct SaveFileActionKey: FocusedValueKey {
-    typealias Value = () -> Void
-}
 
-private struct SaveAsFileActionKey: FocusedValueKey {
-    typealias Value = () -> Void
-}
 
 private struct ZoomInActionKey: FocusedValueKey {
     typealias Value = () -> Void
@@ -684,30 +343,10 @@ private struct ShowReplaceActionKey: FocusedValueKey {
 }
 
 extension FocusedValues {
-    var newFileAction: (() -> Void)? {
-        get { self[NewFileActionKey.self] }
-        set { self[NewFileActionKey.self] = newValue }
-    }
 
-    var openFileAction: (() -> Void)? {
-        get { self[OpenFileActionKey.self] }
-        set { self[OpenFileActionKey.self] = newValue }
-    }
 
-    var openRecentAction: ((URL) -> Void)? {
-        get { self[OpenRecentActionKey.self] }
-        set { self[OpenRecentActionKey.self] = newValue }
-    }
 
-    var saveFileAction: (() -> Void)? {
-        get { self[SaveFileActionKey.self] }
-        set { self[SaveFileActionKey.self] = newValue }
-    }
 
-    var saveAsFileAction: (() -> Void)? {
-        get { self[SaveAsFileActionKey.self] }
-        set { self[SaveAsFileActionKey.self] = newValue }
-    }
 
     var zoomInAction: (() -> Void)? {
         get { self[ZoomInActionKey.self] }

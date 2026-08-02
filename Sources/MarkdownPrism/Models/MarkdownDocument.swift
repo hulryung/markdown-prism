@@ -13,29 +13,32 @@ struct MarkdownDocument {
 
     init(fileURL: URL) throws {
         self.fileURL = fileURL
+        (text, format) = try Self.decode(try Data(contentsOf: fileURL))
+    }
 
-        let data = try Data(contentsOf: fileURL)
-
+    /// Decodes file bytes, reporting the format so a save can reproduce them.
+    static func decode(_ data: Data) throws -> (text: String, format: TextFileFormat) {
         if let utf8Text = String(data: data, encoding: .utf8) {
-            format = TextFileFormat(encoding: .utf8, byteOrderMark: Self.utf8ByteOrderMark(for: data))
-            text = Self.strippingLeadingBOM(from: utf8Text)
-            return
+            return (
+                strippingLeadingBOM(from: utf8Text),
+                TextFileFormat(encoding: .utf8, byteOrderMark: utf8ByteOrderMark(for: data))
+            )
         }
 
-        if let (bomEncoding, bom) = Self.bomEncoding(for: data) {
+        if let (bomEncoding, bom) = bomEncoding(for: data) {
             guard let decoded = String(data: data, encoding: bomEncoding) else {
                 throw Error.unsupportedEncoding
             }
-            format = TextFileFormat(encoding: bomEncoding, byteOrderMark: bom)
-            text = Self.strippingLeadingBOM(from: decoded)
-            return
+            return (
+                strippingLeadingBOM(from: decoded),
+                TextFileFormat(encoding: bomEncoding, byteOrderMark: bom)
+            )
         }
 
         guard let decoded = String(data: data, encoding: .isoLatin1) else {
             throw Error.unsupportedEncoding
         }
-        format = TextFileFormat(encoding: .isoLatin1, byteOrderMark: nil)
-        text = decoded
+        return (decoded, TextFileFormat(encoding: .isoLatin1, byteOrderMark: nil))
     }
 
     private static func utf8ByteOrderMark(for data: Data) -> Data? {

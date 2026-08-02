@@ -7,8 +7,9 @@ LaTeX, and Mermaid rendering. It is a SwiftUI shell around a WKWebView renderer.
 - `Sources/MarkdownPrism/App/`: app entry point, `AppDelegate`, menu commands.
 - `Sources/MarkdownPrism/Views/`: SwiftUI views and the `NSViewRepresentable`
   wrappers for the editor and preview.
-- `Sources/MarkdownPrism/Models/`: document loading, file watching, syntax
-  highlighting, zoom, recent documents, scroll-sync mapping.
+- `Sources/MarkdownPrism/Models/`: `MarkdownFileDocument` (the `FileDocument`
+  behind every window), decoding and encoding, file watching, syntax
+  highlighting, zoom, scroll-sync mapping.
 - `Sources/MarkdownPrism/Resources/`: `preview.html` and `preview-quicklook.html`
   (two shells over the same `js/preview.js`), plus `css/` and vendored `vendor/`
   libraries. Keep the vendor tags in the two shells in sync.
@@ -17,7 +18,9 @@ LaTeX, and Mermaid rendering. It is a SwiftUI shell around a WKWebView renderer.
 - `PROGRESS.md`: current architecture, open items, and the release process.
 
 Keep UI code separate from parsing/rendering logic, and keep rendering logic in
-`js/preview.js` rather than inline in the HTML shells.
+`js/preview.js` rather than inline in the HTML shells. The app is document-based:
+prefer letting `DocumentGroup` and `NSDocument` handle file operations instead of
+reimplementing open/save/recents by hand.
 
 ## Build, Test, and Development Commands
 - `swift build` / `swift test`: compile and test the app target. SwiftPM cannot
