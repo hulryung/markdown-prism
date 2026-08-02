@@ -7,6 +7,9 @@ struct MarkdownDocument {
 
     let text: String
     let fileURL: URL
+    /// How the file was encoded on disk, so a later save can write it back the
+    /// same way.
+    let format: TextFileFormat
 
     init(fileURL: URL) throws {
         self.fileURL = fileURL
@@ -14,14 +17,16 @@ struct MarkdownDocument {
         let data = try Data(contentsOf: fileURL)
 
         if let utf8Text = String(data: data, encoding: .utf8) {
+            format = TextFileFormat(encoding: .utf8, byteOrderMark: Self.utf8ByteOrderMark(for: data))
             text = Self.strippingLeadingBOM(from: utf8Text)
             return
         }
 
-        if let bomEncoding = Self.bomEncoding(for: data) {
+        if let (bomEncoding, bom) = Self.bomEncoding(for: data) {
             guard let decoded = String(data: data, encoding: bomEncoding) else {
                 throw Error.unsupportedEncoding
             }
+            format = TextFileFormat(encoding: bomEncoding, byteOrderMark: bom)
             text = Self.strippingLeadingBOM(from: decoded)
             return
         }
@@ -29,23 +34,29 @@ struct MarkdownDocument {
         guard let decoded = String(data: data, encoding: .isoLatin1) else {
             throw Error.unsupportedEncoding
         }
+        format = TextFileFormat(encoding: .isoLatin1, byteOrderMark: nil)
         text = decoded
     }
 
-    private static func bomEncoding(for data: Data) -> String.Encoding? {
+    private static func utf8ByteOrderMark(for data: Data) -> Data? {
+        let bom = Data([0xEF, 0xBB, 0xBF])
+        return data.starts(with: bom) ? bom : nil
+    }
+
+    private static func bomEncoding(for data: Data) -> (String.Encoding, Data)? {
         let bytes = [UInt8](data.prefix(4))
 
         if bytes.starts(with: [0xFF, 0xFE, 0x00, 0x00]) {
-            return .utf32LittleEndian
+            return (.utf32LittleEndian, Data([0xFF, 0xFE, 0x00, 0x00]))
         }
         if bytes.starts(with: [0x00, 0x00, 0xFE, 0xFF]) {
-            return .utf32BigEndian
+            return (.utf32BigEndian, Data([0x00, 0x00, 0xFE, 0xFF]))
         }
         if bytes.starts(with: [0xFF, 0xFE]) {
-            return .utf16LittleEndian
+            return (.utf16LittleEndian, Data([0xFF, 0xFE]))
         }
         if bytes.starts(with: [0xFE, 0xFF]) {
-            return .utf16BigEndian
+            return (.utf16BigEndian, Data([0xFE, 0xFF]))
         }
         return nil
     }

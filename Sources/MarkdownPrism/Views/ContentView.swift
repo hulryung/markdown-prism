@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var fileWatcher: FileWatcher?
     @State private var scopedAccess: SecurityScopedAccess?
     @State private var scrollSync = ScrollSyncBus()
+    @State private var fileFormat = TextFileFormat.utf8
     @State private var showEditor = true
     @State private var debounceWork: DispatchWorkItem?
     @State private var ignoreNextTextChange = false
@@ -290,6 +291,7 @@ struct ContentView: View {
         fileWatcher = nil
         fileURL = nil
         scopedAccess = nil
+        fileFormat = .utf8
         setDocumentText("", modified: false)
     }
 
@@ -354,7 +356,17 @@ struct ContentView: View {
             fileWatcher?.stop()
         }
         do {
-            try markdownText.write(to: url, atomically: true, encoding: .utf8)
+            // Written in the encoding the file was read in. If the text has
+            // since grown characters that encoding cannot represent, fall back
+            // to UTF-8 and remember that, rather than refusing to save.
+            var data = fileFormat.encode(markdownText)
+            if data == nil {
+                fileFormat = .utf8
+                data = fileFormat.encode(markdownText)
+            }
+            guard let data else { throw MarkdownDocument.Error.unsupportedEncoding }
+
+            try data.write(to: url, options: .atomic)
             openFileState.isModified = false
             if isWatchedURL {
                 startWatchingFile(at: url, forceRestart: true)
@@ -411,6 +423,7 @@ struct ContentView: View {
         do {
             let document = try MarkdownDocument(fileURL: url)
             setDocumentText(document.text, modified: false)
+            fileFormat = document.format
             // On a watcher-driven reload of the same file, keep the token
             // already held rather than replacing it with nothing.
             if access != nil || previousURL != url {
