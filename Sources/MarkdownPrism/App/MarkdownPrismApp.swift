@@ -10,10 +10,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #endif
 
+        // Delayed rather than immediate: a document opened at launch registers
+        // after this point, and creating the welcome document too early would
+        // leave a stray window alongside the file the user actually opened.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [self] in
+            openWelcomeDocumentIfNeeded()
+        }
+
         // Prompt to set as default Markdown app on first launch
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             DefaultAppHelper.promptIfFirstLaunch()
         }
+    }
+
+    /// SwiftUI's DocumentGroup presents the Open panel when the app launches
+    /// with nothing to open, and never consults the AppKit delegate methods for
+    /// untitled files. Creating the document here is what brings the app up on
+    /// the welcome document instead.
+    private func openWelcomeDocumentIfNeeded() {
+        guard NSDocumentController.shared.documents.isEmpty else { return }
+        WelcomeDocument.armForNextDocument()
+        NSDocumentController.shared.newDocument(nil)
     }
 }
 
@@ -26,7 +43,7 @@ struct MarkdownPrismApp: App {
         // unsaved-changes prompts, window tabs and per-document dirty state all
         // come from the document architecture; only the commands below are the
         // app's own.
-        DocumentGroup(newDocument: MarkdownFileDocument()) { file in
+        DocumentGroup(newDocument: WelcomeDocument.makeDocument()) { file in
             ContentView(document: file.$document, fileURL: file.fileURL)
         }
         .commands {

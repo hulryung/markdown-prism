@@ -60,6 +60,7 @@ Tests/MarkdownPrismTests/
 - GFM rendering: tables, task lists, strikethrough, autolinks, emoji
 - Syntax highlighting (highlight.js), LaTeX (KaTeX), Mermaid diagrams
 - Document-based: multiple windows and native tabs, each with its own document
+- Launching with nothing open shows the welcome sample; File > New is empty
 - Split-pane editor with debounced live preview and markdown syntax highlighting
 - Two-way scroll sync between editor and preview
 - Line number gutter
@@ -74,7 +75,6 @@ Tests/MarkdownPrismTests/
 
 | Area | Item |
 |------|------|
-| UI | Launching without a document no longer shows the welcome/demo markdown; a new document starts empty, as a document-based app should. The sample text is gone rather than moved somewhere. |
 | UI | No preferences panel (theme, font), no localization — the app is English-only while the site ships a Korean page. |
 | Testing | UI behaviour (menus, window lifecycle, drag and drop) is still only checked by hand; the renderer and the model layer are covered. |
 
