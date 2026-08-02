@@ -45,8 +45,9 @@ Use `XCTest` for all automated checks.
   detection, recent documents) is unit-testable and should stay that way — pull
   logic out of the view layer rather than leaving it untested.
 - Add a regression test for every renderer or editor bug fix.
-- `js/preview.js` has no test harness yet; changes there need manual checks in
-  both the app and Quick Look.
+- `js/preview.js` is covered by `PreviewRendererTests`, which loads the real
+  shells in a headless `WKWebView` and probes the resulting DOM. Extend it when
+  you touch the renderer; it also guards the Quick Look Content-Security-Policy.
 
 ## Commit & Pull Request Guidelines
 Use `Area: imperative summary` (example: `Preview: cache Mermaid renders`), with

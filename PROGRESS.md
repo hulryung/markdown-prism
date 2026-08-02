@@ -71,7 +71,7 @@ Tests/MarkdownPrismTests/
 | Launch | Passing a file path as a command-line argument (`open -a MarkdownPrism --args <file>`, or running the binary directly) leaves the app running with **no window at all**. Measured: it happens with a readable path, an unreadable one, with the delegate's `application(_:open:)` emptied out, and with the argument never published — but not with an option-shaped argument or no argument. The cause is in AppKit/SwiftUI's own handling of a document path in `argv` for a `WindowGroup` app, not in this code. Every normal path — Finder, the Open panel, drag and drop, `open -a MarkdownPrism <file>` — works. Likely fixed by moving to `DocumentGroup`. |
 | Editor | No line numbers. |
 | UI | No preferences panel (theme, font), no localization — the app is English-only while the site ships a Korean page. |
-| Testing | `js/preview.js` has no automated tests; the rendering pipeline is only covered by hand. |
+| Testing | UI behaviour (menus, window lifecycle, drag and drop) is still only checked by hand; the renderer and the model layer are covered. |
 
 ## Release
 
