@@ -14,6 +14,9 @@ LaTeX, and Mermaid rendering. It is a SwiftUI shell around a WKWebView renderer.
   (two shells over the same `js/preview.js`), plus `css/` and vendored `vendor/`
   libraries. Keep the vendor tags in the two shells in sync.
 - `Sources/QuickLookExtension/`: the `.appex` Quick Look provider.
+- `docs/`: the project site, which shares `docs/assets/images/` with the README.
+  Run new screenshots through `pngquant --quality=75-98` before committing them;
+  a raw window capture is several times larger for no visible gain.
 - `Tests/MarkdownPrismTests/`: XCTest targets mirroring `Models/`.
 - `PROGRESS.md`: current architecture, open items, and the release process.
 
