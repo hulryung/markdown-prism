@@ -25,6 +25,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Reopening — the Dock icon, or opening the app while it is already
+    /// running — with every window closed otherwise lands on the Open panel.
+    /// A new empty document is the more useful answer; the welcome sample
+    /// belongs to a cold launch only.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard !flag else { return true }
+        NSDocumentController.shared.newDocument(nil)
+        return false
+    }
+
     /// SwiftUI's DocumentGroup presents the Open panel when the app launches
     /// with nothing to open, and never consults the AppKit delegate methods for
     /// untitled files. Creating the document here is what brings the app up on
