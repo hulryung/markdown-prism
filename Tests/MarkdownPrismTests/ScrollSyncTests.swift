@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import MarkdownPrism
 
@@ -121,5 +122,43 @@ final class ScrollSyncBusTests: XCTestCase {
         bus.previewDidScroll(toLine: 10)
 
         XCTAssertNil(editorLine)
+    }
+}
+
+final class LineNumberGutterTests: XCTestCase {
+    func test_width_reservesRoomForTwoDigitsEvenInAShortDocument() {
+        var gutter = LineNumberGutter()
+        gutter.lineIndex = LineIndex("one\ntwo\n")
+
+        let twoDigits = gutter.width
+        gutter.lineIndex = LineIndex("only one line")
+
+        XCTAssertEqual(gutter.width, twoDigits, "the gutter should not twitch on short files")
+    }
+
+    func test_width_growsWithTheLineCount() throws {
+        var gutter = LineNumberGutter()
+        var widths: [CGFloat] = []
+        for lines in [90, 900, 9_000, 90_000] {
+            gutter.lineIndex = LineIndex(String(repeating: "x\n", count: lines))
+            widths.append(gutter.width)
+        }
+
+        // Never shrinks as the document grows...
+        for (previous, next) in zip(widths, widths.dropFirst()) {
+            XCTAssertGreaterThanOrEqual(next, previous)
+        }
+        // ...and does grow once the numbers outrun the minimum width, which is
+        // wide enough that crossing 99 lines does not shift the text sideways.
+        XCTAssertGreaterThan(try XCTUnwrap(widths.last), try XCTUnwrap(widths.first))
+    }
+
+    func test_width_tracksTheFontSize() {
+        var small = LineNumberGutter()
+        small.lineIndex = LineIndex(String(repeating: "x\n", count: 500))
+        var large = small
+        large.font = .monospacedDigitSystemFont(ofSize: 24, weight: .regular)
+
+        XCTAssertGreaterThan(large.width, small.width)
     }
 }

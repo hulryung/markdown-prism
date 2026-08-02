@@ -10,6 +10,7 @@ A native macOS Markdown viewer & editor with live preview, Quick Look support, a
 
 - **Live Preview** — Split-pane editor with real-time rendered preview
 - **Scroll Sync** — Editor and preview follow each other, both ways
+- **Line Numbers** — Gutter alongside the editor
 - **GFM Support** — Tables, task lists, strikethrough, autolinks
 - **Syntax Highlighting** — 180+ languages via highlight.js
 - **LaTeX Math** — Inline (`$...$`) and block (`$$...$$`) math with KaTeX

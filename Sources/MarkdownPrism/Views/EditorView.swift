@@ -37,7 +37,7 @@ struct EditorView: NSViewRepresentable {
         textView.isAutomaticSpellingCorrectionEnabled = false
         textView.usesFindPanel = false
 
-        textView.textContainerInset = NSSize(width: 8, height: 8)
+        textView.textContainerInset = NSSize(width: LineNumberGutter.padding, height: 8)
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
@@ -69,6 +69,7 @@ struct EditorView: NSViewRepresentable {
         context.coordinator.highlighter.fontSize = fontSize
         if fontSizeChanged {
             context.coordinator.applyTypingAttributes(to: textView)
+            context.coordinator.applyGutterFont(to: textView, fontSize: fontSize)
         }
 
         let textChanged: Bool
@@ -104,6 +105,30 @@ struct EditorView: NSViewRepresentable {
 
     final class EditorTextView: NSTextView {
         weak var coordinator: Coordinator?
+
+        var gutter = LineNumberGutter() {
+            didSet {
+                // The container is inset by the gutter width so the text never
+                // runs underneath the numbers.
+                let width = gutter.width
+                if textContainerInset.width != width {
+                    textContainerInset = NSSize(width: width, height: textContainerInset.height)
+                }
+                needsDisplay = true
+            }
+        }
+
+        override func drawBackground(in rect: NSRect) {
+            super.drawBackground(in: rect)
+            guard let layoutManager, let textContainer else { return }
+            gutter.draw(
+                in: rect,
+                layoutManager: layoutManager,
+                container: textContainer,
+                containerInset: textContainerInset,
+                bounds: bounds
+            )
+        }
 
         override func cancelOperation(_ sender: Any?) {
             if let onEscape = coordinator?.parent.onEscapePressed {
@@ -158,6 +183,11 @@ struct EditorView: NSViewRepresentable {
 
         func rebuildLineIndex(for text: String) {
             lineIndex = LineIndex(text)
+            if let editor = textView as? EditorTextView {
+                var gutter = editor.gutter
+                gutter.lineIndex = lineIndex
+                editor.gutter = gutter
+            }
         }
 
         func bind(to scrollSync: ScrollSyncBus) {
@@ -175,6 +205,7 @@ struct EditorView: NSViewRepresentable {
                 queue: .main
             ) { [weak self, weak scrollView] _ in
                 guard let self, let scrollView else { return }
+                scrollView.documentView?.needsDisplay = true
                 self.reportScroll(in: scrollView)
             }
         }
@@ -243,6 +274,13 @@ struct EditorView: NSViewRepresentable {
                 deadline: .now() + Self.highlightDebounceInterval,
                 execute: work
             )
+        }
+
+        func applyGutterFont(to textView: NSTextView, fontSize: CGFloat) {
+            guard let editor = textView as? EditorTextView else { return }
+            var gutter = editor.gutter
+            gutter.font = .monospacedDigitSystemFont(ofSize: max(9, fontSize - 2), weight: .regular)
+            editor.gutter = gutter
         }
 
         func applyTypingAttributes(to textView: NSTextView) {
