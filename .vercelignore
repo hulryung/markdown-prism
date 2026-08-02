@@ -1,0 +1,10 @@
+# Only docs/ is published (see vercel.json). Everything else is the app source
+# and its build products, which would otherwise be uploaded on every deploy.
+.build
+build
+DerivedData
+*.xcodeproj
+Sources
+Tests
+scripts
+.env*
