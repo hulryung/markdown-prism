@@ -68,7 +68,7 @@ Tests/MarkdownPrismTests/
 |------|------|
 | Architecture | `OpenFileState` (`isModified`, `saveHandler`) is shared by every window, so restored multi-window sessions can cross wires. A per-document model or `DocumentGroup` would fix it and unlock tabs. |
 | Files | Saving always writes UTF-8, discarding the encoding `MarkdownDocument` detected. |
-| Files | The CLI argument path checks `fileExists` before security-scoped access begins (`MarkdownPrismApp.swift`). |
+| Launch | Passing a file path as a command-line argument (`open -a MarkdownPrism --args <file>`, or running the binary directly) leaves the app running with **no window at all**. Measured: it happens with a readable path, an unreadable one, with the delegate's `application(_:open:)` emptied out, and with the argument never published — but not with an option-shaped argument or no argument. The cause is in AppKit/SwiftUI's own handling of a document path in `argv` for a `WindowGroup` app, not in this code. Every normal path — Finder, the Open panel, drag and drop, `open -a MarkdownPrism <file>` — works. Likely fixed by moving to `DocumentGroup`. |
 | Editor | No line numbers. |
 | UI | No preferences panel (theme, font), no localization — the app is English-only while the site ships a Korean page. |
 | Testing | `js/preview.js` has no automated tests; the rendering pipeline is only covered by hand. |
