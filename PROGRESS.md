@@ -41,10 +41,10 @@ Native shell, web renderer:
 ```
 Sources/MarkdownPrism/
   App/         MarkdownPrismApp, AppDelegate, menu commands
-  Views/       ContentView, EditorView, PreviewView, FindBarView
-  Models/      MarkdownDocument, FileWatcher, MarkdownHighlighter, ZoomState,
-               RecentDocumentsManager, SecurityScopedAccess, LineIndex, ScrollSync,
-               DefaultAppHelper
+  Views/       ContentView, EditorView, PreviewView, FindBarView, LineNumberGutter
+  Models/      MarkdownDocument, TextFileFormat, FileWatcher, MarkdownHighlighter,
+               ZoomState, RecentDocumentsManager, SecurityScopedAccess, LineIndex,
+               ScrollSync, DefaultAppHelper
   Resources/   preview.html, preview-quicklook.html, js/, css/, vendor/
 Sources/QuickLookExtension/
 Tests/MarkdownPrismTests/
@@ -59,7 +59,7 @@ Tests/MarkdownPrismTests/
 - Line number gutter
 - Find and replace, with regex, across both panes
 - Quick Look extension
-- File watching with reload prompts, atomic saves, encoding detection
+- File watching with reload prompts, atomic saves that preserve the file's encoding
 - Open Recent backed by security-scoped bookmarks, zoom, full-width toggle,
   internal heading links, "set as default app"
 
@@ -68,7 +68,6 @@ Tests/MarkdownPrismTests/
 | Area | Item |
 |------|------|
 | Architecture | `OpenFileState` (`isModified`, `saveHandler`) is shared by every window, so restored multi-window sessions can cross wires. A per-document model or `DocumentGroup` would fix it and unlock tabs. |
-| Files | Saving always writes UTF-8, discarding the encoding `MarkdownDocument` detected. |
 | Launch | Passing a file path as a command-line argument (`open -a MarkdownPrism --args <file>`, or running the binary directly) leaves the app running with **no window at all**. Measured: it happens with a readable path, an unreadable one, with the delegate's `application(_:open:)` emptied out, and with the argument never published — but not with an option-shaped argument or no argument. The cause is in AppKit/SwiftUI's own handling of a document path in `argv` for a `WindowGroup` app, not in this code. Every normal path — Finder, the Open panel, drag and drop, `open -a MarkdownPrism <file>` — works. Likely fixed by moving to `DocumentGroup`. |
 | UI | No preferences panel (theme, font), no localization — the app is English-only while the site ships a Korean page. |
 | Testing | UI behaviour (menus, window lifecycle, drag and drop) is still only checked by hand; the renderer and the model layer are covered. |
