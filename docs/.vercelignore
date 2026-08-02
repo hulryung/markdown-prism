@@ -1,0 +1,5 @@
+# Local Vercel state and the OIDC token `vercel link` writes. Never part of the
+# deployed site — a static host would serve them as plain files.
+.vercel
+.env*
+.vercelignore
