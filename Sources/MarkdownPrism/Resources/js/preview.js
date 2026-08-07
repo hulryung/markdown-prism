@@ -8,6 +8,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var mermaidCache = new Map();
   var lastMarkdown = '';
+  // The version being compared against, or null when the page is not showing
+  // changes, so a theme change redraws whichever of the two is on screen.
+  var lastBaseline = null;
 
   prefersDark.addEventListener('change', function (e) {
     mermaid.initialize({
@@ -16,7 +19,11 @@ document.addEventListener('DOMContentLoaded', function () {
       theme: e.matches ? 'dark' : 'default'
     });
     mermaidCache.clear();
-    renderMarkdown(lastMarkdown);
+    if (lastBaseline === null) {
+      renderMarkdown(lastMarkdown);
+    } else {
+      renderDiff(lastBaseline, lastMarkdown);
+    }
   });
 
   // GitHub-style heading slug generator
@@ -179,32 +186,76 @@ document.addEventListener('DOMContentLoaded', function () {
     window.scrollTo(0, y);
   }
 
+  var SANITIZE_OPTIONS = {
+    ADD_TAGS: ['details', 'summary'],
+    ADD_ATTR: ['open', 'id'],
+    FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form'],
+    FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover']
+  };
+
+  // Rendered, sanitised HTML for a document, or null when DOMPurify is missing —
+  // in which case no rendered markup may be shown at all.
+  function toSafeHTML(markdown) {
+    if (!window.DOMPurify) return null;
+    return DOMPurify.sanitize(md.render(markdown || ''), SANITIZE_OPTIONS);
+  }
+
+  // The scroll position is restored twice because Mermaid resolves later and
+  // changes the document height when it does.
+  function finishRender(scrollY) {
+    renderMath();
+    scrollWithoutReporting(scrollY);
+    renderMermaidBlocks().then(function () {
+      scrollWithoutReporting(scrollY);
+    });
+  }
+
   function renderMarkdown(markdown) {
     lastMarkdown = markdown || '';
+    lastBaseline = null;
 
-    if (!window.DOMPurify) {
-      document.getElementById('content').textContent = markdown || '';
+    var content = document.getElementById('content');
+    content.classList.remove('diff-mode');
+
+    var html = toSafeHTML(lastMarkdown);
+    if (html === null) {
+      content.textContent = lastMarkdown;
       return;
     }
 
     var y = window.scrollY;
-    var raw = md.render(markdown || '');
-    var html = DOMPurify.sanitize(raw, {
-      ADD_TAGS: ['details', 'summary'],
-      ADD_ATTR: ['open', 'id'],
-      FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form'],
-      FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover']
-    });
-    var content = document.getElementById('content');
     content.innerHTML = html;
-    renderMath();
-    scrollWithoutReporting(y);
-    renderMermaidBlocks().then(function () {
-      scrollWithoutReporting(y);
-    });
+    finishRender(y);
+  }
+
+  // Renders `markdown` as a revision of `baseline`: one document with the
+  // changes marked up in place, rather than two documents to compare by eye.
+  function renderDiff(baseline, markdown) {
+    lastBaseline = baseline || '';
+    lastMarkdown = markdown || '';
+
+    var baselineHTML = toSafeHTML(lastBaseline);
+    var currentHTML = toSafeHTML(lastMarkdown);
+    if (baselineHTML === null || currentHTML === null || !window.MarkdownDiff) {
+      renderMarkdown(markdown);
+      return;
+    }
+
+    var before = document.createElement('div');
+    before.innerHTML = baselineHTML;
+    var after = document.createElement('div');
+    after.innerHTML = currentHTML;
+
+    var content = document.getElementById('content');
+    var y = window.scrollY;
+    content.classList.add('diff-mode');
+    content.innerHTML = '';
+    content.appendChild(window.MarkdownDiff.merge(before, after));
+    finishRender(y);
   }
 
   window.renderMarkdown = renderMarkdown;
+  window.renderDiff = renderDiff;
   renderMarkdown('');
 
   // --- Scroll sync ---

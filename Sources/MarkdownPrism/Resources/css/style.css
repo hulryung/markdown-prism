@@ -360,3 +360,87 @@ mark.search-highlight.search-highlight-current {
         background-color: rgba(255, 150, 0, 0.45);
     }
 }
+
+/* Rich diff
+   A block that was added or removed outright is tinted and carries a rule in
+   the margin; a block that survived an edit keeps its own styling and marks
+   only the words that changed. The gutter is drawn with a negative margin that
+   the border and padding add back up to, so a changed paragraph's text still
+   lines up with the paragraphs around it. */
+#content .diff-block-added {
+    background-color: #e6ffec;
+}
+
+#content .diff-block-removed {
+    background-color: #ffebe9;
+}
+
+#content > .diff-block {
+    padding: 2px 8px 2px 12px;
+    margin-left: -16px;
+    border-left: 4px solid transparent;
+    border-radius: 0 4px 4px 0;
+}
+
+#content > .diff-block-added {
+    border-left-color: #2da44e;
+}
+
+#content > .diff-block-removed {
+    border-left-color: #cf222e;
+}
+
+#content > .diff-block-changed {
+    border-left-color: #d4a72c;
+}
+
+#content ins.diff-words-added,
+#content del.diff-words-removed {
+    border-radius: 2px;
+    padding: 1px 2px;
+}
+
+/* A removal is nearly always followed straight away by what replaced it, with
+   no space between them in the text. Without this they read as one run-on word. */
+#content del.diff-words-removed + ins.diff-words-added {
+    margin-left: 4px;
+}
+
+#content ins.diff-words-added {
+    background-color: #abf2bc;
+    text-decoration: none;
+}
+
+#content del.diff-words-removed {
+    background-color: #ffcecb;
+}
+
+@media (prefers-color-scheme: dark) {
+    #content .diff-block-added {
+        background-color: rgba(46, 160, 67, 0.15);
+    }
+
+    #content .diff-block-removed {
+        background-color: rgba(248, 81, 73, 0.15);
+    }
+
+    #content > .diff-block-added {
+        border-left-color: #3fb950;
+    }
+
+    #content > .diff-block-removed {
+        border-left-color: #f85149;
+    }
+
+    #content > .diff-block-changed {
+        border-left-color: #d29922;
+    }
+
+    #content ins.diff-words-added {
+        background-color: rgba(46, 160, 67, 0.4);
+    }
+
+    #content del.diff-words-removed {
+        background-color: rgba(248, 81, 73, 0.4);
+    }
+}
