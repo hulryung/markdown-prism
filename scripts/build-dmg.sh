@@ -151,6 +151,22 @@ hdiutil create \
 
 rm -rf "$STAGING"
 
+# hdiutil leaves the image unsigned. Gatekeeper assesses the disk image a reader
+# downloads, not only the app inside it, and with no signature that assessment
+# has nothing to work from — `spctl -t open` answers "no usable signature"
+# however well notarized the app is. Signing has to happen before the image is
+# submitted, since notarization covers what it was given.
+#
+# The identifier is pinned rather than left to codesign, which derives one from
+# the file name and truncates it at the first dot — "MarkdownPrism-0.7.0.dmg"
+# signs as "MarkdownPrism-0", so it would silently change with every minor
+# version.
+echo "==> Signing DMG"
+codesign --force --sign "$SIGN_IDENTITY" --timestamp \
+    --identifier "com.markdownprism.dmg" \
+    "$DMG_PATH"
+codesign --verify --strict --verbose=2 "$DMG_PATH"
+
 if [ -n "${NOTARY_PROFILE:-}" ]; then
     # A second submission: a ticket for the app does not cover the disk image,
     # and stapler can only staple an artifact that was itself submitted.
@@ -159,11 +175,25 @@ if [ -n "${NOTARY_PROFILE:-}" ]; then
     echo "==> Stapling DMG"
     xcrun stapler staple "$DMG_PATH"
     xcrun stapler validate "$DMG_PATH"
+
+    # Stapling rewrites the image to carry the ticket, so the signature is
+    # checked again rather than assumed to have survived it.
+    echo "==> Verifying the signed, stapled DMG"
+    codesign --verify --strict --verbose=2 "$DMG_PATH"
+
+    # The assessment a reader's Mac makes of the downloaded image. This is the
+    # check that fails when the DMG is notarized but unsigned, so it is worth
+    # failing the build over rather than discovering after publishing.
+    if ! spctl -a -vv -t open --context context:primary-signature "$DMG_PATH"; then
+        echo "Error: Gatekeeper rejects $DMG_PATH"
+        exit 1
+    fi
 else
     echo
-    echo "Not notarized (NOTARY_PROFILE unset). Gatekeeper will reject this DMG"
-    echo "on other Macs. Re-run with NOTARY_PROFILE set rather than notarizing"
-    echo "the DMG by hand — the app inside has to be stapled before packaging."
+    echo "Signed but not notarized (NOTARY_PROFILE unset). Gatekeeper will still"
+    echo "reject this DMG on other Macs — a signature is not a substitute for a"
+    echo "ticket. Re-run with NOTARY_PROFILE set rather than notarizing the DMG"
+    echo "by hand: the app inside has to be stapled before packaging."
 fi
 
 echo

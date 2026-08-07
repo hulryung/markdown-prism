@@ -114,7 +114,12 @@ Tests/MarkdownPrismTests/
   keychain profile to notarize and staple; without it the DMG is signed but
   Gatekeeper rejects it on other Macs. Two submissions run: the app is
   notarized and stapled before packaging so the ticket ships inside the
-  bundle, then the DMG is notarized and stapled as well.
+  bundle, then the DMG is signed, notarized and stapled as well. The disk
+  image is signed because Gatekeeper assesses what the reader downloaded, not
+  only the app inside it — `hdiutil` leaves it unsigned, and `spctl -t open`
+  then answers "no usable signature" however well notarized the app is. The
+  script makes that assessment itself and fails rather than let an unusable
+  image reach a release.
 - `scripts/validate-dmg.sh <dmg>` checks the app bundle name inside the DMG.
 - `scripts/update-cask.sh <dmg>` regenerates the Homebrew cask, reading the
   version from `project.yml` and the app name from the DMG.
