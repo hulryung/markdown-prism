@@ -536,6 +536,141 @@ final class PreviewRendererTests: XCTestCase {
         XCTAssertEqual(result["removedWithLines"] as? Int, 0)
     }
 
+    // MARK: - Moving between changes
+
+    private static let changeCensus = """
+    (function () {
+      var ticks = document.querySelectorAll('#diff-ruler .diff-ruler-tick');
+      var ruler = document.getElementById('diff-ruler');
+      return JSON.stringify({
+        count: window.changeSummary().count,
+        current: window.changeSummary().current,
+        ticks: ticks.length,
+        kinds: Array.prototype.map.call(ticks, function (t) {
+          return t.className.replace('diff-ruler-tick ', '');
+        }),
+        rulerShown: !!ruler && ruler.style.display !== 'none'
+      });
+    })()
+    """
+
+    private func changes(
+        _ markdown: String,
+        comparedWith baseline: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws -> [String: Any] {
+        let json = try XCTUnwrap(
+            try render(markdown, comparedWith: baseline, then: Self.changeCensus, file: file, line: line) as? String
+        )
+        return try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
+        )
+    }
+
+    func test_separatedEdits_countAsOneChangeEach() throws {
+        let result = try changes(
+            "# Spec\n\nAlpha.\n\nBeta edited.\n\nGamma.\n\nDelta edited.\n\nEpsilon.\n",
+            comparedWith: "# Spec\n\nAlpha.\n\nBeta.\n\nGamma.\n\nDelta.\n\nEpsilon.\n"
+        )
+
+        XCTAssertEqual(result["count"] as? Int, 2)
+        XCTAssertEqual(result["ticks"] as? Int, 2, "one tick per change")
+        XCTAssertEqual(result["rulerShown"] as? Bool, true)
+    }
+
+    /// Adjacent marked blocks are one hunk, the same unit git reports. Stopping
+    /// twice inside a single highlighted band would read as a bug.
+    func test_adjacentEdits_countAsASingleChange() throws {
+        let result = try changes(
+            "One.\n\nTwo changed.\n\nThree changed.\n",
+            comparedWith: "One.\n\nTwo.\n\nThree.\n"
+        )
+
+        XCTAssertEqual(result["count"] as? Int, 1)
+        XCTAssertEqual(result["ticks"] as? Int, 1)
+    }
+
+    func test_anUnchangedDocument_hasNoChangesToStepThroughAndNoRuler() throws {
+        let markdown = "# Spec\n\nThe body.\n"
+        let result = try changes(markdown, comparedWith: markdown)
+
+        XCTAssertEqual(result["count"] as? Int, 0)
+        XCTAssertEqual(result["ticks"] as? Int, 0)
+        XCTAssertEqual(result["rulerShown"] as? Bool, false)
+    }
+
+    /// A run holding both a removal and what replaced it is a revision, not two
+    /// separate things, and the ruler colours it as one.
+    func test_theRulerColoursEachChangeByWhatItIs() throws {
+        let result = try changes(
+            "Kept.\n\n```\nnew code\n```\n\nAlso kept.\n\nAdded paragraph.\n",
+            comparedWith: "Kept.\n\n```\nold code\n```\n\nAlso kept.\n"
+        )
+
+        let kinds = try XCTUnwrap(result["kinds"] as? [String])
+        XCTAssertEqual(kinds, ["diff-ruler-changed", "diff-ruler-added"])
+    }
+
+    func test_steppingThroughChanges_wrapsAroundAndReportsPosition() throws {
+        let probe = """
+        (function () {
+          var steps = [];
+          steps.push(window.nextChange());
+          steps.push(window.nextChange());
+          steps.push(window.nextChange());
+          steps.push(window.previousChange());
+          steps.push({ marked: document.querySelectorAll('.diff-change-current').length });
+          return JSON.stringify(steps);
+        })()
+        """
+
+        let json = try XCTUnwrap(
+            try render(
+                "# Spec\n\nAlpha.\n\nBeta edited.\n\nGamma.\n\nDelta edited.\n\nEpsilon.\n",
+                comparedWith: "# Spec\n\nAlpha.\n\nBeta.\n\nGamma.\n\nDelta.\n\nEpsilon.\n",
+                then: probe
+            ) as? String
+        )
+        let steps = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Int]]
+        )
+
+        XCTAssertEqual(steps[0]["current"], 1)
+        XCTAssertEqual(steps[1]["current"], 2)
+        XCTAssertEqual(steps[2]["current"], 1, "past the last change comes the first")
+        XCTAssertEqual(steps[3]["current"], 2, "and back again from the first")
+        XCTAssertEqual(steps[0]["count"], 2)
+        XCTAssertGreaterThan(try XCTUnwrap(steps[4]["marked"]), 0, "the current change is marked")
+    }
+
+    /// Leaving the comparison has to take the ruler with it, or a plain document
+    /// keeps a strip of ticks pointing at blocks that are no longer marked.
+    func test_renderingPlainlyAfterADiff_clearsTheChangesAndTheRuler() throws {
+        let probe = """
+        (function () {
+          window.renderMarkdown('# Plain\\n\\nNothing to compare.\\n');
+          var ruler = document.getElementById('diff-ruler');
+          return JSON.stringify({
+            count: window.changeSummary().count,
+            rulerShown: !!ruler && ruler.style.display !== 'none',
+            marked: document.querySelectorAll('.diff-block, .diff-change-current').length
+          });
+        })()
+        """
+
+        let json = try XCTUnwrap(
+            try render("One.\n\nTwo changed.\n", comparedWith: "One.\n\nTwo.\n", then: probe) as? String
+        )
+        let result = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
+        )
+
+        XCTAssertEqual(result["count"] as? Int, 0)
+        XCTAssertEqual(result["rulerShown"] as? Bool, false)
+        XCTAssertEqual(result["marked"] as? Int, 0)
+    }
+
     /// The word diff builds markup by hand, so the invariant that keeps it safe
     /// is checked directly: strip the annotations back out and what is left has
     /// to be exactly the new side.

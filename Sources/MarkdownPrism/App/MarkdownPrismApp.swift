@@ -80,6 +80,8 @@ struct MarkdownPrismApp: App {
 
 struct EditorCommands: Commands {
     @FocusedValue(\.diffCommand) var diffCommand
+    @FocusedValue(\.nextChangeAction) var nextChangeAction
+    @FocusedValue(\.previousChangeAction) var previousChangeAction
     @FocusedValue(\.zoomInAction) var zoomInAction
     @FocusedValue(\.zoomOutAction) var zoomOutAction
     @FocusedValue(\.resetZoomAction) var resetZoomAction
@@ -109,6 +111,20 @@ struct EditorCommands: Commands {
             }
             .keyboardShortcut("d", modifiers: [.command, .shift])
             .disabled(diffCommand == nil)
+
+            // Stepping between changes is what makes a long document readable;
+            // both are disabled unless there is something to step through.
+            Button("Next Change") {
+                nextChangeAction?()
+            }
+            .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+            .disabled(nextChangeAction == nil)
+
+            Button("Previous Change") {
+                previousChangeAction?()
+            }
+            .keyboardShortcut(.upArrow, modifiers: [.command, .option])
+            .disabled(previousChangeAction == nil)
 
             Divider()
         }

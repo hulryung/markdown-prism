@@ -20,6 +20,16 @@
 (function (global) {
   'use strict';
 
+  /* What a marked block is called. Kept in one place because the page also
+     navigates by these — `preview.js` walks them for next/previous change and
+     for the overview ruler — and two copies of a class name drift. */
+  var CLASSES = {
+    block: 'diff-block',
+    added: 'diff-block-added',
+    removed: 'diff-block-removed',
+    changed: 'diff-block-changed'
+  };
+
   /* Elements that stand on their own. Diffing inside a code fence or an image
      produces noise rather than insight, and a Mermaid source block only renders
      if it reaches the renderer intact. */
@@ -205,7 +215,7 @@
       shell.appendChild(
         mergeChildren(elementChildren(oldElement), elementChildren(newElement), depth + 1)
       );
-      shell.classList.add('diff-block', 'diff-block-changed');
+      shell.classList.add(CLASSES.block, CLASSES.changed);
       return shell;
     }
 
@@ -215,7 +225,7 @@
     }
 
     shell.innerHTML = mergeWords(oldElement.innerHTML, newElement.innerHTML);
-    shell.classList.add('diff-block', 'diff-block-changed');
+    shell.classList.add(CLASSES.block, CLASSES.changed);
     return shell;
   }
 
@@ -259,7 +269,7 @@
      removals: they name lines in a document that no longer exists, and scroll
      sync interpolates between whatever anchors it finds. */
   function mark(element, kind) {
-    element.classList.add('diff-block', kind === 'added' ? 'diff-block-added' : 'diff-block-removed');
+    element.classList.add(CLASSES.block, kind === 'added' ? CLASSES.added : CLASSES.removed);
     if (kind === 'removed') {
       element.removeAttribute('data-source-line');
       var nested = element.querySelectorAll('[data-source-line]');
@@ -381,6 +391,7 @@
 
   global.MarkdownDiff = {
     merge: merge,
+    classes: CLASSES,
     // Exposed for the renderer tests, which check these directly rather than
     // inferring them from a rendered page.
     mergeWords: mergeWords,

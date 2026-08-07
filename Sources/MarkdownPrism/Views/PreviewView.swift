@@ -14,9 +14,13 @@ struct PreviewView: NSViewRepresentable {
     let fontStack: String
     let fontSize: CGFloat
     let scrollSync: ScrollSyncBus
+    /// Raised to step to the next change and lowered to step back, the same way
+    /// `searchRevision` drives find.
+    var changeRevision: Int = 0
     var fileURL: URL?
     var onOpenFile: ((URL) -> Void)?
     var onSearchResults: ((Int, Int) -> Void)?
+    var onChangesCounted: ((Int, Int) -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -41,6 +45,8 @@ struct PreviewView: NSViewRepresentable {
         context.coordinator.fileURL = fileURL
         context.coordinator.onOpenFile = onOpenFile
         context.coordinator.onSearchResults = onSearchResults
+        context.coordinator.onChangesCounted = onChangesCounted
+        context.coordinator.pendingChangeRevision = changeRevision
         context.coordinator.bind(to: scrollSync)
 
         let templateURL: URL? = {
@@ -76,9 +82,11 @@ struct PreviewView: NSViewRepresentable {
         c.pendingIsRegex = isRegex
         c.pendingFullWidth = useFullWidth
         c.pendingTypography = Typography(stack: fontStack, size: fontSize)
+        c.pendingChangeRevision = changeRevision
         c.fileURL = fileURL
         c.onOpenFile = onOpenFile
         c.onSearchResults = onSearchResults
+        c.onChangesCounted = onChangesCounted
         c.bind(to: scrollSync)
         if c.isLoaded {
             c.sync()
@@ -106,6 +114,9 @@ struct PreviewView: NSViewRepresentable {
         var fileURL: URL?
         var onOpenFile: ((URL) -> Void)?
         var onSearchResults: ((Int, Int) -> Void)?
+        var onChangesCounted: ((Int, Int) -> Void)?
+        var pendingChangeRevision = 0
+        private var appliedChangeRevision = 0
         private weak var scrollSync: ScrollSyncBus?
 
         func bind(to scrollSync: ScrollSyncBus) {
@@ -163,8 +174,33 @@ struct PreviewView: NSViewRepresentable {
             applyFullWidthIfNeeded()
             applyTypographyIfNeeded()
             let didRender = renderIfNeeded()
-            if didRender { appliedSearchText = nil }
+            if didRender {
+                appliedSearchText = nil
+                // A fresh render starts from no current change, so a revision
+                // left over from the previous document must not step it.
+                appliedChangeRevision = pendingChangeRevision
+            }
             searchIfNeeded()
+            navigateChangesIfNeeded()
+        }
+
+        private func navigateChangesIfNeeded() {
+            guard let webView else { return }
+            guard pendingChangeRevision != appliedChangeRevision else { return }
+
+            let function = pendingChangeRevision > appliedChangeRevision ? "nextChange" : "previousChange"
+            appliedChangeRevision = pendingChangeRevision
+            webView.evaluateJavaScript("window.\(function)();") { [weak self] result, _ in
+                self?.handleChangeSummary(result)
+            }
+        }
+
+        /// Renders report how many changes they produced; anything else — a
+        /// plain render, or a failure — means there are none to step through.
+        private func handleChangeSummary(_ result: Any?) {
+            let count = (result as? [String: Any])?["count"] as? Int ?? 0
+            let current = (result as? [String: Any])?["current"] as? Int ?? 0
+            DispatchQueue.main.async { self.onChangesCounted?(count, current) }
         }
 
         private func applyFullWidthIfNeeded() {
@@ -208,8 +244,9 @@ struct PreviewView: NSViewRepresentable {
                 script = "window.renderMarkdown(\(markdown));"
             }
 
-            webView.evaluateJavaScript(script) { _, error in
+            webView.evaluateJavaScript(script) { [weak self] result, error in
                 if let error { print("render error: \(error.localizedDescription)") }
+                self?.handleChangeSummary(result)
             }
             renderedMarkdown = currentMarkdown
             renderedBaseline = currentBaseline

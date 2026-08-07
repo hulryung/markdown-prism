@@ -205,7 +205,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function finishRender(scrollY) {
     renderMath();
     scrollWithoutReporting(scrollY);
-    renderMermaidBlocks().then(function () {
+    return renderMermaidBlocks().then(function () {
       scrollWithoutReporting(scrollY);
     });
   }
@@ -216,6 +216,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var content = document.getElementById('content');
     content.classList.remove('diff-mode');
+    clearChanges();
 
     var html = toSafeHTML(lastMarkdown);
     if (html === null) {
@@ -251,7 +252,13 @@ document.addEventListener('DOMContentLoaded', function () {
     content.classList.add('diff-mode');
     content.innerHTML = '';
     content.appendChild(window.MarkdownDiff.merge(before, after));
-    finishRender(y);
+
+    clearChanges();
+    var summary = refreshChanges();
+    // Diagrams resolve later and move everything below them, so the ruler is
+    // measured again once they have.
+    finishRender(y).then(refreshChanges);
+    return summary;
   }
 
   window.renderMarkdown = renderMarkdown;
@@ -471,6 +478,189 @@ document.addEventListener('DOMContentLoaded', function () {
   window.findNextMatch = findNextMatch;
   window.findPreviousMatch = findPreviousMatch;
   window.clearFindHighlights = clearFindHighlights;
+
+  // --- Moving between changes ---
+  //
+  // A change is a contiguous run of marked blocks — the unit git calls a hunk.
+  // Consecutive marked siblings count as one stop, so a removed paragraph and
+  // the one that replaced it do not ask to be visited twice.
+
+  var _changes = [];
+  var _currentChange = -1;
+  var _ruler = null;
+
+  function diffClasses() {
+    return window.MarkdownDiff.classes;
+  }
+
+  function collectChanges() {
+    var blockClass = diffClasses().block;
+    var children = document.getElementById('content').children;
+    var groups = [];
+    var run = null;
+
+    for (var i = 0; i < children.length; i++) {
+      if (children[i].classList.contains(blockClass)) {
+        if (!run) {
+          run = [];
+          groups.push(run);
+        }
+        run.push(children[i]);
+      } else {
+        run = null;
+      }
+    }
+    return groups;
+  }
+
+  // A run holding both a removal and the addition that replaced it reads as a
+  // revision, not as two things, and is coloured like one.
+  function changeKind(group) {
+    var classes = diffClasses();
+    var added = false;
+    var removed = false;
+    var changed = false;
+
+    for (var i = 0; i < group.length; i++) {
+      if (group[i].classList.contains(classes.added)) added = true;
+      if (group[i].classList.contains(classes.removed)) removed = true;
+      if (group[i].classList.contains(classes.changed)) changed = true;
+    }
+
+    if (changed || (added && removed)) return 'changed';
+    return added ? 'added' : 'removed';
+  }
+
+  function clearCurrentChange() {
+    var marked = document.querySelectorAll('.diff-change-current');
+    for (var i = 0; i < marked.length; i++) {
+      marked[i].classList.remove('diff-change-current');
+    }
+  }
+
+  function scrollToChange(index) {
+    if (_changes.length === 0) return { count: 0, current: 0 };
+
+    clearCurrentChange();
+    var count = _changes.length;
+    _currentChange = ((index % count) + count) % count;
+
+    var group = _changes[_currentChange];
+    for (var i = 0; i < group.length; i++) {
+      group[i].classList.add('diff-change-current');
+    }
+    group[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+
+    markCurrentTick();
+    return { count: count, current: _currentChange + 1 };
+  }
+
+  function nextChange() {
+    if (_changes.length === 0) return { count: 0, current: 0 };
+    return scrollToChange(_currentChange + 1);
+  }
+
+  function previousChange() {
+    if (_changes.length === 0) return { count: 0, current: 0 };
+    // From nowhere, back is the last one rather than the first.
+    return scrollToChange(_currentChange <= 0 ? _changes.length - 1 : _currentChange - 1);
+  }
+
+  // --- Overview ruler ---
+  //
+  // One tick per change at its position down the document, so a long file shows
+  // where the edits are without being scrolled through.
+
+  function rulerElement() {
+    if (!_ruler) {
+      _ruler = document.createElement('div');
+      _ruler.id = 'diff-ruler';
+      _ruler.addEventListener('click', function (event) {
+        var index = event.target && event.target.getAttribute('data-change-index');
+        if (index !== null && index !== undefined) {
+          scrollToChange(parseInt(index, 10));
+        }
+      });
+      document.body.appendChild(_ruler);
+    }
+    return _ruler;
+  }
+
+  function renderRuler() {
+    var element = rulerElement();
+    element.textContent = '';
+
+    if (_changes.length === 0) {
+      element.style.display = 'none';
+      return;
+    }
+    element.style.display = 'block';
+
+    var documentHeight = document.documentElement.scrollHeight || 1;
+    for (var i = 0; i < _changes.length; i++) {
+      var group = _changes[i];
+      var first = group[0].getBoundingClientRect();
+      var last = group[group.length - 1].getBoundingClientRect();
+      var top = first.top + window.scrollY;
+      var height = (last.top + window.scrollY + last.height) - top;
+
+      var tick = document.createElement('div');
+      tick.className = 'diff-ruler-tick diff-ruler-' + changeKind(group);
+      tick.style.top = (top / documentHeight * 100) + '%';
+      tick.style.height = (height / documentHeight * 100) + '%';
+      tick.setAttribute('data-change-index', String(i));
+      element.appendChild(tick);
+    }
+    markCurrentTick();
+  }
+
+  function markCurrentTick() {
+    if (!_ruler) return;
+    var ticks = _ruler.children;
+    for (var i = 0; i < ticks.length; i++) {
+      if (i === _currentChange) {
+        ticks[i].classList.add('current');
+      } else {
+        ticks[i].classList.remove('current');
+      }
+    }
+  }
+
+  function refreshChanges() {
+    _changes = collectChanges();
+    if (_currentChange >= _changes.length) _currentChange = -1;
+    renderRuler();
+    return { count: _changes.length, current: _currentChange + 1 };
+  }
+
+  function clearChanges() {
+    _changes = [];
+    _currentChange = -1;
+    clearCurrentChange();
+    if (_ruler) {
+      _ruler.textContent = '';
+      _ruler.style.display = 'none';
+    }
+  }
+
+  // Ticks are placed as a fraction of the document, and both the fraction and
+  // the document change when the pane is resized.
+  var rulerRefreshPending = false;
+  window.addEventListener('resize', function () {
+    if (_changes.length === 0 || rulerRefreshPending) return;
+    rulerRefreshPending = true;
+    window.requestAnimationFrame(function () {
+      rulerRefreshPending = false;
+      renderRuler();
+    });
+  });
+
+  window.nextChange = nextChange;
+  window.previousChange = previousChange;
+  window.scrollToChange = scrollToChange;
+  window.changeSummary = function () {
+    return { count: _changes.length, current: _currentChange + 1 };
+  };
 
   // Intercept link clicks and delegate to native app
   document.addEventListener('click', function (e) {

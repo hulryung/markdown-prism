@@ -8,6 +8,10 @@ import SwiftUI
 struct DiffBarView: View {
     let baseline: DiffBaseline
     let state: DiffSession.State
+    let changeCount: Int
+    let currentChange: Int
+    let onNextChange: () -> Void
+    let onPreviousChange: () -> Void
     let onGrantAccess: () -> Void
     let onDismiss: () -> Void
 
@@ -23,6 +27,8 @@ struct DiffBarView: View {
 
             Spacer(minLength: 8)
 
+            navigation
+
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
             }
@@ -34,6 +40,29 @@ struct DiffBarView: View {
         .padding(.vertical, 6)
         .background(.bar)
         .overlay(alignment: .bottom) { Divider() }
+    }
+
+    /// Stepping between changes, which is what makes a long document usable —
+    /// the alternative is scrolling past everything that did not change.
+    @ViewBuilder
+    private var navigation: some View {
+        if changeCount > 0 {
+            Text(currentChange > 0 ? "\(currentChange) of \(changeCount)" : "\(changeCount) changes")
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+
+            Button(action: onPreviousChange) {
+                Image(systemName: "chevron.up")
+            }
+            .buttonStyle(.borderless)
+            .help("Previous change")
+
+            Button(action: onNextChange) {
+                Image(systemName: "chevron.down")
+            }
+            .buttonStyle(.borderless)
+            .help("Next change")
+        }
     }
 
     @ViewBuilder

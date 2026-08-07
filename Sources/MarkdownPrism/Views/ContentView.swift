@@ -25,6 +25,9 @@ struct ContentView: View {
     @State private var isReplaceVisible = false
     @State private var replaceRevision = 0
     @State private var replaceAllRevision = 0
+    @State private var changeRevision = 0
+    @State private var changeCount = 0
+    @State private var currentChange = 0
 
     var body: some View {
         innerBody
@@ -32,6 +35,8 @@ struct ContentView: View {
                 \.diffCommand,
                 DiffCommand(current: diff.baseline, select: { selectBaseline($0) })
             )
+            .focusedSceneValue(\.nextChangeAction, changeCount > 0 ? { nextChange() } : nil)
+            .focusedSceneValue(\.previousChangeAction, changeCount > 0 ? { previousChange() } : nil)
             .focusedSceneValue(\.findAction, { showSearch() })
             .focusedSceneValue(\.findNextAction, isSearchVisible ? { findNext() } : nil)
             .focusedSceneValue(\.findPreviousAction, isSearchVisible ? { findPrevious() } : nil)
@@ -66,6 +71,10 @@ struct ContentView: View {
             DiffBarView(
                 baseline: diff.baseline,
                 state: diff.state,
+                changeCount: changeCount,
+                currentChange: currentChange,
+                onNextChange: nextChange,
+                onPreviousChange: previousChange,
                 onGrantAccess: {
                     guard let fileURL else { return }
                     diff.requestAccess(for: fileURL, text: document.text)
@@ -222,11 +231,16 @@ struct ContentView: View {
             fontStack: settings.previewFontStack,
             fontSize: settings.previewFontSize,
             scrollSync: scrollSync,
+            changeRevision: changeRevision,
             fileURL: fileURL,
             onOpenFile: { url in open(url) },
             onSearchResults: { count, current in
                 searchMatchCount = count
                 searchCurrentMatch = current
+            },
+            onChangesCounted: { count, current in
+                changeCount = count
+                currentChange = current
             }
         )
         .frame(minWidth: 300)
@@ -301,6 +315,14 @@ struct ContentView: View {
 
     private func selectBaseline(_ baseline: DiffBaseline) {
         diff.select(baseline, for: fileURL, text: document.text)
+    }
+
+    private func nextChange() {
+        changeRevision += 1
+    }
+
+    private func previousChange() {
+        changeRevision -= 1
     }
 
     /// Following the editor only makes sense while the preview is showing the
@@ -415,6 +437,14 @@ private struct DiffCommandKey: FocusedValueKey {
     typealias Value = DiffCommand
 }
 
+private struct NextChangeActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
+private struct PreviousChangeActionKey: FocusedValueKey {
+    typealias Value = () -> Void
+}
+
 
 
 
@@ -456,6 +486,16 @@ extension FocusedValues {
     var diffCommand: DiffCommand? {
         get { self[DiffCommandKey.self] }
         set { self[DiffCommandKey.self] = newValue }
+    }
+
+    var nextChangeAction: (() -> Void)? {
+        get { self[NextChangeActionKey.self] }
+        set { self[NextChangeActionKey.self] = newValue }
+    }
+
+    var previousChangeAction: (() -> Void)? {
+        get { self[PreviousChangeActionKey.self] }
+        set { self[PreviousChangeActionKey.self] = newValue }
     }
 
 

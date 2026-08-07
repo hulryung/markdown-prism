@@ -415,7 +415,75 @@ mark.search-highlight.search-highlight-current {
     background-color: #ffcecb;
 }
 
+/* The change the reader has stepped to. An outline rather than a fill, so it
+   reads on top of the block's own added/removed tint instead of replacing it. */
+#content .diff-block.diff-change-current {
+    outline: 2px solid #0969da;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* Overview ruler: one tick per change at its position down the document, so a
+   long file shows where the edits are without being scrolled through. The
+   container ignores clicks and the ticks take them, which keeps the strip from
+   swallowing selections at the right edge of the text. */
+#diff-ruler {
+    position: fixed;
+    top: 0;
+    right: 1px;
+    bottom: 0;
+    width: 5px;
+    z-index: 10;
+    display: none;
+    pointer-events: none;
+}
+
+#diff-ruler .diff-ruler-tick {
+    position: absolute;
+    right: 0;
+    width: 5px;
+    min-height: 3px;
+    border-radius: 3px;
+    opacity: 0.7;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+#diff-ruler .diff-ruler-added {
+    background-color: #2da44e;
+}
+
+#diff-ruler .diff-ruler-removed {
+    background-color: #cf222e;
+}
+
+#diff-ruler .diff-ruler-changed {
+    background-color: #d4a72c;
+}
+
+#diff-ruler .diff-ruler-tick.current {
+    opacity: 1;
+    outline: 1px solid var(--color-fg);
+    outline-offset: 1px;
+}
+
 @media (prefers-color-scheme: dark) {
+    #content .diff-block.diff-change-current {
+        outline-color: #58a6ff;
+    }
+
+    #diff-ruler .diff-ruler-added {
+        background-color: #3fb950;
+    }
+
+    #diff-ruler .diff-ruler-removed {
+        background-color: #f85149;
+    }
+
+    #diff-ruler .diff-ruler-changed {
+        background-color: #d29922;
+    }
+
     #content .diff-block-added {
         background-color: rgba(46, 160, 67, 0.15);
     }

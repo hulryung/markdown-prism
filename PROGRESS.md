@@ -45,8 +45,14 @@ Native shell, web renderer:
 
 Both versions are rendered to HTML and the difference is taken over the
 resulting elements (`js/diff.js`), so the result stays a readable document
-rather than a wall of +/- lines. Two sandbox constraints shape the Swift side,
-both verified against a signed sandboxed build:
+rather than a wall of +/- lines.
+
+`preview.js` navigates the result and draws the overview ruler. A change is a
+contiguous run of marked blocks — the unit git calls a hunk — which is what
+keeps a single highlighted band from asking to be visited twice.
+
+Two sandbox constraints shape the Swift side, both verified against a signed
+sandboxed build:
 
 - Opening `spec.md` grants that file alone, not the `.git` beside it. The
   reader hands over the repository folder once through an open panel and
@@ -96,6 +102,8 @@ Tests/MarkdownPrismTests/
 - Rich diff against Git: the preview renders changes in place — tinted blocks
   for whole additions and removals, inline `ins`/`del` for edited wording —
   against the last commit, the index, or between the two
+- Stepping between changes (⌥⌘↓ / ⌥⌘↑) and an overview ruler down the right of
+  the preview, so a long document shows where its edits are
 
 ## Open items
 
