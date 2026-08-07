@@ -6,6 +6,7 @@ struct ContentView: View {
     let fileURL: URL?
 
     @ObservedObject private var settings = AppSettings.shared
+    @StateObject private var diff = DiffSession()
     @AppStorage("zoomScale") private var zoomScale = ZoomState.defaultScale
     @AppStorage("useFullWidth") private var useFullWidth = false
     @State private var previewText = ""
@@ -27,6 +28,10 @@ struct ContentView: View {
 
     var body: some View {
         innerBody
+            .focusedSceneValue(
+                \.diffCommand,
+                DiffCommand(current: diff.baseline, select: { selectBaseline($0) })
+            )
             .focusedSceneValue(\.findAction, { showSearch() })
             .focusedSceneValue(\.findNextAction, isSearchVisible ? { findNext() } : nil)
             .focusedSceneValue(\.findPreviousAction, isSearchVisible ? { findPrevious() } : nil)
@@ -55,9 +60,42 @@ struct ContentView: View {
         }
     }
 
+    @ViewBuilder
+    private var diffBar: some View {
+        if diff.baseline.isShowingChanges {
+            DiffBarView(
+                baseline: diff.baseline,
+                state: diff.state,
+                onGrantAccess: {
+                    guard let fileURL else { return }
+                    diff.requestAccess(for: fileURL, text: document.text)
+                },
+                onDismiss: { selectBaseline(.off) }
+            )
+        }
+    }
+
+    private var diffMenu: some View {
+        Menu {
+            Picker("Compare With", selection: baselineBinding) {
+                ForEach(DiffBaseline.allCases) { baseline in
+                    Text(baseline.label).tag(baseline)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Label(
+                "Show Changes",
+                systemImage: diff.baseline.isShowingChanges ? "plusminus.circle.fill" : "plusminus.circle"
+            )
+        }
+        .help("Show changes against Git")
+    }
+
     private var innerBody: some View {
         VStack(spacing: 0) {
             findBar
+            diffBar
             HSplitView {
                 if showEditor {
                     editorPane
@@ -75,6 +113,9 @@ struct ContentView: View {
                     )
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
+            }
+            ToolbarItem(placement: .automatic) {
+                diffMenu
             }
             ToolbarItem(placement: .automatic) {
                 Button(action: { useFullWidth.toggle() }) {
@@ -100,17 +141,21 @@ struct ContentView: View {
             handleDrop(providers)
         }
         .onAppear {
-            scrollSync.isEnabled = showEditor
+            updateScrollSyncEnabled()
             previewText = document.text
             startWatchingFile()
         }
         .onChange(of: fileURL) {
             // Save As, Rename and Move To all repoint the document.
             startWatchingFile()
+            diff.reload(for: fileURL, text: document.text)
         }
         .onChange(of: showEditor) {
             // Nothing to follow along with while the editor is hidden.
-            scrollSync.isEnabled = showEditor
+            updateScrollSyncEnabled()
+        }
+        .onChange(of: diff.state) {
+            updateScrollSyncEnabled()
         }
         .onDisappear {
             debounceWork?.cancel()
@@ -149,9 +194,26 @@ struct ContentView: View {
         .frame(minWidth: 300)
     }
 
+    /// What the preview renders. Comparing two stored revisions puts the later
+    /// of them on screen; every other case shows the editor's own text.
+    private var previewMarkdown: String {
+        if case .ready(let comparison) = diff.state, let current = comparison.current {
+            return current
+        }
+        return previewText
+    }
+
+    /// The version the preview marks its changes against, or nil to render the
+    /// document plainly.
+    private var previewBaseline: String? {
+        guard case .ready(let comparison) = diff.state else { return nil }
+        return comparison.baseline
+    }
+
     private var previewPane: some View {
         PreviewView(
-            markdown: previewText,
+            markdown: previewMarkdown,
+            baseline: previewBaseline,
             zoomScale: zoomState.zoomScale,
             searchText: activeSearchText,
             searchRevision: searchRevision,
@@ -220,9 +282,38 @@ struct ContentView: View {
         debounceWork?.cancel()
         let work = DispatchWorkItem {
             previewText = text
+            // Only the counts move as the reader types; the stored side they are
+            // counted against has not changed, so this reads no history.
+            diff.updateCounts(for: text)
         }
         debounceWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+    }
+
+    // MARK: - Showing Changes
+
+    private var baselineBinding: Binding<DiffBaseline> {
+        Binding(
+            get: { diff.baseline },
+            set: { selectBaseline($0) }
+        )
+    }
+
+    private func selectBaseline(_ baseline: DiffBaseline) {
+        diff.select(baseline, for: fileURL, text: document.text)
+    }
+
+    /// Following the editor only makes sense while the preview is showing the
+    /// editor's own text — comparing two stored revisions puts a document on
+    /// screen that the cursor has no position in.
+    private func updateScrollSyncEnabled() {
+        let showingEditorText: Bool
+        if case .ready(let comparison) = diff.state {
+            showingEditorText = comparison.current == nil
+        } else {
+            showingEditorText = true
+        }
+        scrollSync.isEnabled = showEditor && showingEditorText
     }
 
     // MARK: - External Changes
@@ -264,6 +355,10 @@ struct ContentView: View {
             toContentsOf: url,
             ofType: nsDocument.fileType ?? UTType.markdown.identifier
         )
+
+        // Whatever changed the file may well have been a git operation, so the
+        // stored side is re-read rather than assumed to still be current.
+        diff.reload(for: url, text: document.text)
     }
 
     /// Opens a file in its own document window, which is also what gives the
@@ -309,6 +404,17 @@ struct ContentView: View {
 
 // MARK: - Focused Values for Menu Commands
 
+/// Lets the View menu drive the focused window's comparison, and show which one
+/// it is already on.
+struct DiffCommand {
+    var current: DiffBaseline
+    var select: (DiffBaseline) -> Void
+}
+
+private struct DiffCommandKey: FocusedValueKey {
+    typealias Value = DiffCommand
+}
+
 
 
 
@@ -347,9 +453,10 @@ private struct ShowReplaceActionKey: FocusedValueKey {
 }
 
 extension FocusedValues {
-
-
-
+    var diffCommand: DiffCommand? {
+        get { self[DiffCommandKey.self] }
+        set { self[DiffCommandKey.self] = newValue }
+    }
 
 
     var zoomInAction: (() -> Void)? {

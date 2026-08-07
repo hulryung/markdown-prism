@@ -3,6 +3,9 @@ import WebKit
 
 struct PreviewView: NSViewRepresentable {
     let markdown: String
+    /// The version to mark `markdown`'s changes against, or nil to render it
+    /// plainly.
+    var baseline: String?
     let zoomScale: Double
     let searchText: String
     let searchRevision: Int
@@ -66,6 +69,7 @@ struct PreviewView: NSViewRepresentable {
     func updateNSView(_ webView: WKWebView, context: Context) {
         let c = context.coordinator
         c.currentMarkdown = markdown
+        c.currentBaseline = baseline
         c.currentZoomScale = zoomScale
         c.pendingSearchText = searchText
         c.pendingSearchRevision = searchRevision
@@ -85,7 +89,9 @@ struct PreviewView: NSViewRepresentable {
         weak var webView: WKWebView?
         var isLoaded = false
         var currentMarkdown = ""
-        var renderedMarkdown = ""
+        var currentBaseline: String?
+        private var renderedMarkdown: String?
+        private var renderedBaseline: String?
         var currentZoomScale = ZoomState.defaultScale
         var pendingSearchText = ""
         var pendingSearchRevision = 0
@@ -116,7 +122,8 @@ struct PreviewView: NSViewRepresentable {
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             isLoaded = true
-            renderedMarkdown = ""
+            renderedMarkdown = nil
+            renderedBaseline = nil
             appliedSearchText = nil
             appliedTypography = nil
             sync()
@@ -188,16 +195,30 @@ struct PreviewView: NSViewRepresentable {
 
         private func renderIfNeeded() -> Bool {
             guard let webView else { return false }
-            guard renderedMarkdown != currentMarkdown else { return false }
+            guard renderedMarkdown != currentMarkdown || renderedBaseline != currentBaseline else {
+                return false
+            }
+            guard let markdown = Self.jsonString(currentMarkdown) else { return false }
 
-            guard let encoded = try? JSONEncoder().encode(currentMarkdown),
-                  let jsonString = String(data: encoded, encoding: .utf8) else { return false }
+            let script: String
+            if let baseline = currentBaseline {
+                guard let encodedBaseline = Self.jsonString(baseline) else { return false }
+                script = "window.renderDiff(\(encodedBaseline), \(markdown));"
+            } else {
+                script = "window.renderMarkdown(\(markdown));"
+            }
 
-            webView.evaluateJavaScript("window.renderMarkdown(\(jsonString));") { _, error in
+            webView.evaluateJavaScript(script) { _, error in
                 if let error { print("render error: \(error.localizedDescription)") }
             }
             renderedMarkdown = currentMarkdown
+            renderedBaseline = currentBaseline
             return true
+        }
+
+        private static func jsonString(_ value: String) -> String? {
+            guard let encoded = try? JSONEncoder().encode(value) else { return nil }
+            return String(data: encoded, encoding: .utf8)
         }
 
         private func searchIfNeeded() {

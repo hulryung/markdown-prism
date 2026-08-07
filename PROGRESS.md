@@ -41,6 +41,26 @@ Native shell, web renderer:
   the bundle; nothing is copied per preview.
 - All JS/CSS is vendored under `Resources/vendor/`. The app renders offline.
 
+### Showing changes
+
+Both versions are rendered to HTML and the difference is taken over the
+resulting elements (`js/diff.js`), so the result stays a readable document
+rather than a wall of +/- lines. Two sandbox constraints shape the Swift side,
+both verified against a signed sandboxed build:
+
+- Opening `spec.md` grants that file alone, not the `.git` beside it. The
+  reader hands over the repository folder once through an open panel and
+  `RepositoryAccess` keeps it as a security-scoped bookmark. The extension that
+  bookmark opens **is** inherited by the `git` child process — before
+  `startAccessingSecurityScopedResource` the child gets `Operation not
+  permitted`, after it the read succeeds.
+- `/usr/bin/git` is the `xcrun` shim, and `xcrun` refuses to run inside an App
+  Sandbox at all. `GitRepository` therefore resolves the real binary — via
+  `/var/db/xcode_select_link`, then the Command Line Tools and Xcode paths —
+  which does run, and stays subject to the sandbox. Anything that picks the
+  shim passes the unsandboxed tests and fails in the shipped app, so
+  `GitRepositoryTests` guards the choice.
+
 ## Layout
 
 ```
@@ -73,6 +93,9 @@ Tests/MarkdownPrismTests/
 - Saves preserve the encoding the file was read in
 - Settings for theme (system/light/dark) and editor and preview fonts
 - Zoom, full-width toggle, internal heading links, "set as default app"
+- Rich diff against Git: the preview renders changes in place — tinted blocks
+  for whole additions and removals, inline `ins`/`del` for edited wording —
+  against the last commit, the index, or between the two
 
 ## Open items
 
