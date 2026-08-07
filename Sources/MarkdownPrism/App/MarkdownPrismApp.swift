@@ -19,6 +19,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             openWelcomeDocument()
         }
 
+        openComparisonIfRequested()
+
         // The saved theme has to land before the first window draws, or the app
         // flashes the system appearance and then corrects itself.
         AppSettings.shared.applyAppearance()
@@ -47,6 +49,73 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard NSDocumentController.shared.documents.isEmpty else { return }
         WelcomeDocument.armForNextDocument()
         NSDocumentController.shared.newDocument(nil)
+    }
+
+    // MARK: - Comparisons handed over by git difftool
+
+    /// AppKit routes opened files through the delegate only when it answers to
+    /// this, so answering no outside a comparison leaves the document machinery
+    /// — Finder, Open Recent, drag to the Dock — running exactly as it did.
+    override func responds(to selector: Selector!) -> Bool {
+        if selector == #selector(NSApplicationDelegate.application(_:openFiles:)) {
+            return DiffLaunch.isRequested()
+        }
+        return super.responds(to: selector)
+    }
+
+    /// Only reached for a launch that asked for a comparison; see above.
+    ///
+    /// The delivery is answered and discarded. A document-based app is handed
+    /// exactly one of the two files, whichever LaunchServices picks, and neither
+    /// belongs in a document window — they are git's temporary copies. The two
+    /// sides are read from the arguments instead, which name both.
+    func application(_ sender: NSApplication, openFiles filenames: [String]) {
+        sender.reply(toOpenOrPrint: .success)
+    }
+    /// A comparison window is the whole reason this launch happened, so closing
+    /// it ends the run — which is also what releases the `open -W` that git is
+    /// waiting on before it moves to the next file.
+    ///
+    /// Not before that window exists, though. A comparison opens no document, so
+    /// between launch and the window appearing the app has none at all, and
+    /// would otherwise read that as nothing left to do and quit.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        DiffLaunch.isRequested() && ComparisonWindow.hasShown
+    }
+
+    /// Shows the comparison the arguments describe, once the files can be read.
+    ///
+    /// Being passed to `open` is what grants them, but the grant is not in place
+    /// the moment the app comes up — the same read fails here and succeeds a
+    /// fraction of a second later. The wait is a run-loop hop rather than a
+    /// sleep or a nested run loop: the first blocks the delivery being waited
+    /// on, and the second lets the app terminate out from under this.
+    @MainActor
+    private func openComparisonIfRequested(attempt: Int = 0) {
+        guard DiffLaunch.isRequested() else { return }
+
+        if let comparison = DiffLaunch.comparison(read: { try? MarkdownDocument(fileURL: $0).text }) {
+            ComparisonWindow.show(comparison)
+            return
+        }
+
+        // Measured at well under 100ms; the ceiling is for a loaded machine.
+        guard attempt < 40 else {
+            let alert = NSAlert()
+            alert.messageText = "Could not read the versions to compare"
+            alert.informativeText = """
+                Git extracts the two versions to temporary files and removes them \
+                when the tool exits. Check the difftool command in your Git config.
+                """
+            alert.alertStyle = .warning
+            alert.runModal()
+            NSApp.terminate(nil)
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            self.openComparisonIfRequested(attempt: attempt + 1)
+        }
     }
 }
 
@@ -95,7 +164,7 @@ struct EditorCommands: Commands {
         CommandGroup(after: .toolbar) {
             Menu("Show Changes") {
                 Picker("Compare With", selection: baselineBinding) {
-                    ForEach(DiffBaseline.allCases) { baseline in
+                    ForEach(DiffBaseline.menuOptions) { baseline in
                         Text(baseline.label).tag(baseline)
                     }
                 }

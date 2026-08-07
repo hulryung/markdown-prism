@@ -87,7 +87,7 @@ struct ContentView: View {
     private var diffMenu: some View {
         Menu {
             Picker("Compare With", selection: baselineBinding) {
-                ForEach(DiffBaseline.allCases) { baseline in
+                ForEach(DiffBaseline.menuOptions) { baseline in
                     Text(baseline.label).tag(baseline)
                 }
             }
