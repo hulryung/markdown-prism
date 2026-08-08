@@ -1,6 +1,6 @@
 # markdown-prism Status
 
-> Last updated: 2026-08-02
+> Last updated: 2026-08-08
 > Status: shipping — signed, notarized, distributed via the `hulryung/tap` Homebrew cask
 
 All four planned phases (viewer, editor, Quick Look, polish) are done. This
@@ -15,11 +15,11 @@ Native shell, web renderer:
 
 ```
 [.md file] ──> MarkdownFileDocument ──> ContentView ──┬──> EditorView   (NSTextView + MarkdownHighlighter)
-                                                      └──> PreviewView  (WKWebView)
+                                    DiffSession ──────┴──> PreviewView  (WKWebView)
                                                              │
-                                    evaluateJavaScript("renderMarkdown(...)")
+                        evaluateJavaScript("renderMarkdown(...)" / "renderDiff(...)")
                                                              ▼
-                                        preview.html ──> js/preview.js
+                                        preview.html ──> js/preview.js ──> js/diff.js
                                                              │
                             ┌────────────┬───────────┬───────┴──────┬──────────┐
                             ▼            ▼           ▼              ▼          ▼
@@ -31,9 +31,11 @@ Native shell, web renderer:
   versions, unsaved-changes prompts, window tabs, per-window dirty state and an
   Open Recent that survives relaunch inside the sandbox all come from there
   rather than from hand-written code.
-- **Swift → JS**: markdown is JSON-encoded and passed to `window.renderMarkdown`.
+- **Swift → JS**: markdown is JSON-encoded and passed to `window.renderMarkdown`,
+  or to `window.renderDiff` with the version to mark it against.
 - **JS → Swift**: `WKScriptMessageHandler` for link clicks and preview scroll position.
-- **Rendering logic** lives in `Resources/js/preview.js`, shared by two shells:
+- **Rendering logic** lives in `Resources/js/preview.js` and `js/diff.js`, shared
+  by two shells:
   - `preview.html` — in-app preview, allows remote images.
   - `preview-quicklook.html` — same page under a strict Content-Security-Policy,
     since a Quick Look preview renders whatever file Finder points at.
@@ -72,12 +74,13 @@ sandboxed build:
 ```
 Sources/MarkdownPrism/
   App/         MarkdownPrismApp, AppDelegate, menu commands
-  Views/       ContentView, EditorView, PreviewView, FindBarView, LineNumberGutter,
-               SettingsView
+  Views/       ContentView, EditorView, PreviewView, FindBarView, DiffBarView,
+               LineNumberGutter, SettingsView
   Models/      MarkdownFileDocument, MarkdownDocument (decoding), AppSettings,
                TextFileFormat,
                FileWatcher, MarkdownHighlighter, ZoomState, LineIndex, ScrollSync,
-               DefaultAppHelper
+               DefaultAppHelper,
+               GitRepository, RepositoryAccess, DiffSession, DiffBaseline, DiffStats
   Resources/   preview.html, preview-quicklook.html, js/, css/, vendor/
 Sources/QuickLookExtension/
 Tests/MarkdownPrismTests/
@@ -111,6 +114,7 @@ Tests/MarkdownPrismTests/
 |------|------|
 | UI | No localization — the app is English-only while the site ships a Korean page. |
 | Testing | UI behaviour (menus, window lifecycle, drag and drop) is still only checked by hand; the renderer and the model layer are covered. |
+| Diff | Running as a `git difftool` (#10) is unfinished: reading the two versions git extracts works, showing them in exactly one window does not. The issue carries what was measured; start there rather than from the local `difftool-experiment` branch. |
 
 ## Release
 
