@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://prism.huconn.com/sitemap.xml
+Sitemap: https://prism.hulryung.com/sitemap.xml

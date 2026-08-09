@@ -1,6 +1,6 @@
 # Markdown Prism
 
-> **Homepage:** [prism.huconn.com](https://prism.huconn.com)
+> **Homepage:** [prism.hulryung.com](https://prism.hulryung.com)
 
 A native macOS Markdown viewer & editor with live preview, Quick Look support, and rich rendering.
 
