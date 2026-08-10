@@ -84,6 +84,36 @@ struct GitRepository {
         return GitRepository(root: URL(fileURLWithPath: path, isDirectory: true))
     }
 
+    /// The nearest ancestor of `fileURL` holding a `.git`, found by looking
+    /// rather than by running anything.
+    ///
+    /// Works inside the sandbox even for directories the app has no grant for:
+    /// asking whether a path exists is a metadata question, and that stays
+    /// allowed where reading contents does not — an ancestor without `.git`
+    /// answers ENOENT rather than EPERM. Which is what lets the open panel start
+    /// at the repository instead of at wherever the file happens to sit, so
+    /// granting it is one click rather than a climb.
+    ///
+    /// Only a guess, and treated as one: it says where to point the panel, never
+    /// what the app may read. `discover(containing:)` is still what establishes
+    /// there is a repository there.
+    ///
+    /// The kind of `.git` is deliberately not checked — it is a file rather than
+    /// a directory in a worktree and in a submodule.
+    static func likelyRoot(containing fileURL: URL) -> URL? {
+        var directory = fileURL.deletingLastPathComponent().standardizedFileURL
+
+        while directory.path != "/" {
+            if FileManager.default.fileExists(atPath: directory.appendingPathComponent(".git").path) {
+                return directory
+            }
+            let parent = directory.deletingLastPathComponent().standardizedFileURL
+            guard parent.path != directory.path else { break }
+            directory = parent
+        }
+        return nil
+    }
+
     // MARK: - Reading
 
     /// The file's contents at `revision`, or nil when the file does not exist

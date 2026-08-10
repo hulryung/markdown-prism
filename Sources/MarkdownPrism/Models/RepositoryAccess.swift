@@ -97,11 +97,22 @@ final class RepositoryAccess: RepositoryGranting {
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
         panel.prompt = "Grant Access"
-        panel.message = """
+
+        // Opening at the repository rather than at the file's own folder, which
+        // for anything under a subdirectory means climbing back out before the
+        // panel is even useful. The root is only a guess — the reader can still
+        // go anywhere from here — but it is right nearly every time.
+        let root = GitRepository.likelyRoot(containing: fileURL)
+        panel.directoryURL = root ?? fileURL.deletingLastPathComponent()
+        panel.message = root.map { root in
+            """
+            Grant access to \u{201C}\(root.lastPathComponent)\u{201D} so Markdown Prism can read its \
+            history and show changes to \u{201C}\(fileURL.lastPathComponent)\u{201D}. It asks once per repository.
+            """
+        } ?? """
             Choose the Git repository folder that contains \u{201C}\(fileURL.lastPathComponent)\u{201D}.
             Markdown Prism reads its history to show changes, and remembers the folder so it only asks once.
             """
-        panel.directoryURL = fileURL.deletingLastPathComponent()
 
         guard panel.runModal() == .OK, let folder = panel.url else { return false }
 

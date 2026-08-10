@@ -232,6 +232,79 @@ final class GitRepositoryTests: XCTestCase {
         )
     }
 
+    // MARK: - Finding the repository to ask for
+
+    /// What the open panel starts at. Reported by looking rather than by running
+    /// git, because it has to work before the app has been granted anything.
+    func test_likelyRoot_findsTheRepositoryFromASubdirectory() throws {
+        let file = try write("docs/deep/guide.md", "# Guide\n")
+
+        let found = try XCTUnwrap(GitRepository.likelyRoot(containing: file))
+        XCTAssertEqual(
+            found.resolvingSymlinksInPath().standardizedFileURL.path,
+            root.resolvingSymlinksInPath().standardizedFileURL.path
+        )
+    }
+
+    func test_likelyRoot_findsTheRepositoryFromTheRootItself() throws {
+        let file = try write("spec.md", "# Spec\n")
+
+        let found = try XCTUnwrap(GitRepository.likelyRoot(containing: file))
+        XCTAssertEqual(
+            found.resolvingSymlinksInPath().standardizedFileURL.path,
+            root.resolvingSymlinksInPath().standardizedFileURL.path
+        )
+    }
+
+    /// `.git` is a file rather than a directory in a worktree and in a
+    /// submodule, so its kind must not be part of the test.
+    func test_likelyRoot_acceptsAGitFileAsWellAsAGitDirectory() throws {
+        let elsewhere = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("markdown-prism-worktree-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: elsewhere.appendingPathComponent("docs"),
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: elsewhere) }
+
+        try "gitdir: /somewhere/.git/worktrees/x\n"
+            .write(to: elsewhere.appendingPathComponent(".git"), atomically: true, encoding: .utf8)
+        let file = elsewhere.appendingPathComponent("docs/spec.md")
+        try "# Spec\n".write(to: file, atomically: true, encoding: .utf8)
+
+        XCTAssertEqual(
+            GitRepository.likelyRoot(containing: file)?.standardizedFileURL.path,
+            elsewhere.standardizedFileURL.path
+        )
+    }
+
+    func test_likelyRoot_outsideARepository_isNil() throws {
+        let outside = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("markdown-prism-loose-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: outside) }
+
+        let file = outside.appendingPathComponent("loose.md")
+        try "# Loose\n".write(to: file, atomically: true, encoding: .utf8)
+
+        XCTAssertNil(GitRepository.likelyRoot(containing: file))
+    }
+
+    /// A repository inside another one belongs to the nearer of the two.
+    func test_likelyRoot_prefersTheNearestRepository() throws {
+        let inner = root.appendingPathComponent("vendor/library", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: inner.appendingPathComponent(".git"),
+            withIntermediateDirectories: true
+        )
+        let file = try write("vendor/library/README.md", "# Library\n")
+
+        XCTAssertEqual(
+            GitRepository.likelyRoot(containing: file)?.resolvingSymlinksInPath().standardizedFileURL.path,
+            inner.resolvingSymlinksInPath().standardizedFileURL.path
+        )
+    }
+
     // MARK: - Which git gets run
 
     /// `/usr/bin/git` is the `xcrun` shim, and `xcrun` refuses to run inside an
