@@ -13,8 +13,8 @@ settings:
     # Single source of truth for the version. Both Info.plists are generated
     # from this file by xcodegen and reference these as build settings, so this
     # is the only place a release bump needs to touch.
-    MARKETING_VERSION: "0.7.1"
-    CURRENT_PROJECT_VERSION: "14"
+    MARKETING_VERSION: "0.7.2"
+    CURRENT_PROJECT_VERSION: "15"
   configs:
     Release:
       CODE_SIGN_INJECT_BASE_ENTITLEMENTS: false
