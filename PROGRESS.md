@@ -137,3 +137,25 @@ Tests/MarkdownPrismTests/
   version from `project.yml` and the app name from the DMG.
 - CI (`.github/workflows/ci.yml`) runs `swift build`, `swift test`, and an
   xcodegen + xcodebuild Release build on every push and pull request.
+
+## Site
+
+`docs/` is the site at [prism.hulryung.com](https://prism.hulryung.com), served
+by Vercel from `vercel.json`'s `outputDirectory`.
+
+**Pushing does not deploy it.** The Vercel project has no Git connection, so a
+change under `docs/` reaches the site only when someone runs:
+
+```
+vercel deploy --prod
+```
+
+The link that command needs lives in `.vercel/`, which is ignored — a fresh
+clone has to `vercel link` to the `markdown-prism` project under the personal
+account before it can deploy.
+
+DNS is Cloudflare: `prism` is a CNAME to the project's `*.vercel-dns-017.com`
+target with the proxy **off**, since proxying stops Vercel issuing the
+certificate. The previous address, `prism.huconn.com`, is a 404 rather than a
+redirect — the project behind it was deleted, so old links and the search index
+did not carry over.
