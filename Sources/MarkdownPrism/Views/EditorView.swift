@@ -302,27 +302,8 @@ struct EditorView: NSViewRepresentable {
             textView.font = highlighter.baseFont
         }
 
-        /// Stops the code background following the caret out of a code span.
-        ///
-        /// Inheriting the surrounding style is what keeps typing inside bold or
-        /// a heading from flashing plain, and those are carried by the font and
-        /// the foreground colour. The background is carried by code alone, and
-        /// an inline span ends on a backtick — so the caret sitting after one
-        /// inherits a background that belongs to the character behind it, and
-        /// hands it to everything typed next. Newlines included, which is why it
-        /// showed as a band across the whole line rather than behind the words.
-        ///
-        /// It has to be cleared eagerly rather than left to the re-highlight:
-        /// that only resets the paragraph the edit was in, so a background
-        /// carried into an earlier paragraph would never be reset at all.
-        ///
-        /// Inside a fenced block the inheritance is right and is left alone.
         private func clearStrayCodeBackground(in textView: NSTextView) {
-            guard textView.typingAttributes[.backgroundColor] != nil else { return }
-            guard !highlighter.isInsideCodeBlock(textView.string, at: textView.selectedRange().location) else {
-                return
-            }
-            textView.typingAttributes.removeValue(forKey: .backgroundColor)
+            textView.clearStrayCodeBackground(using: highlighter)
         }
 
         // MARK: - Search
@@ -495,5 +476,31 @@ struct EditorView: NSViewRepresentable {
                 textView.didChangeText()
             }
         }
+    }
+}
+
+extension NSTextView {
+    /// Stops the code background following the caret out of a code span.
+    ///
+    /// Typing attributes are inherited from the character before the caret,
+    /// deliberately: that is what keeps typing inside bold or a heading from
+    /// flashing plain until the debounced re-highlight catches up. Those styles
+    /// are carried by the font and the foreground colour. The background is
+    /// carried by code alone — and an inline span ends on a backtick, so a caret
+    /// sitting after one inherits a background belonging to the character behind
+    /// it and hands it to everything typed next.
+    ///
+    /// Newlines included, which is what made it visible: a styled newline draws
+    /// as a band across the full width of the line rather than behind any words.
+    ///
+    /// Cleared eagerly rather than left to the next highlight, which resets only
+    /// the paragraph the edit was in — a background carried into an earlier
+    /// paragraph would never be reset at all.
+    ///
+    /// Inside a fenced block the inheritance is right, and is left alone.
+    func clearStrayCodeBackground(using highlighter: MarkdownHighlighter) {
+        guard typingAttributes[.backgroundColor] != nil else { return }
+        guard !highlighter.isInsideCodeBlock(string, at: selectedRange().location) else { return }
+        typingAttributes.removeValue(forKey: .backgroundColor)
     }
 }
