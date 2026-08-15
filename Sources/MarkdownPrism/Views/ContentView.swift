@@ -361,6 +361,12 @@ struct ContentView: View {
         guard self.fileURL == url,
               let nsDocument = NSDocumentController.shared.document(for: url) else { return }
 
+        // The watcher cannot tell the app's own writes from anyone else's, and
+        // the app writes often: autosaving in place saves while the reader is
+        // still typing. Comparing what landed is what separates them, and it
+        // needs no window of suppression around saving to get right.
+        guard !MarkdownDocument.file(at: url, holds: document.text) else { return }
+
         if nsDocument.isDocumentEdited {
             let alert = NSAlert()
             alert.messageText = "The file was changed on disk"

@@ -16,6 +16,22 @@ struct MarkdownDocument {
         (text, format) = try Self.decode(try Data(contentsOf: fileURL))
     }
 
+    /// Whether the file at `url` already holds `text`.
+    ///
+    /// A save the app just made looks exactly like a change from outside — the
+    /// same write, the same event — and autosaving in place means that happens
+    /// while the reader types, not only when they ask to save. What tells the
+    /// two apart is what landed: if the file already says what is on screen,
+    /// there is nothing to reload and nothing worth asking about.
+    ///
+    /// An unreadable file answers false, which sends the caller down its usual
+    /// path rather than inventing an outcome here.
+    static func file(at url: URL, holds text: String) -> Bool {
+        guard let data = try? Data(contentsOf: url),
+              let decoded = try? decode(data) else { return false }
+        return decoded.text == text
+    }
+
     /// Decodes file bytes, reporting the format so a save can reproduce them.
     static func decode(_ data: Data) throws -> (text: String, format: TextFileFormat) {
         if let utf8Text = String(data: data, encoding: .utf8) {

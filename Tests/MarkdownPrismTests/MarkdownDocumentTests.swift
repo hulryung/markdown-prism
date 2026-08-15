@@ -106,4 +106,48 @@ final class MarkdownDocumentTests: XCTestCase {
         XCTAssertEqual(document.text, expected)
         XCTAssertFalse(document.text.hasPrefix("\u{FEFF}"))
     }
+
+    // MARK: - Telling our own saves apart from someone else's
+
+    private func scratchFile(_ contents: String, encoding: String.Encoding = .utf8) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("markdown-prism-\(UUID().uuidString).md")
+        try XCTUnwrap(contents.data(using: encoding)).write(to: url)
+        return url
+    }
+
+    /// The watcher cannot tell the app's own write from anyone else's; what
+    /// landed can.
+    func test_fileHolds_isTrueWhenTheFileAlreadySaysWhatIsOnScreen() throws {
+        let url = try scratchFile("# Spec\n\nBody.\n")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        XCTAssertTrue(MarkdownDocument.file(at: url, holds: "# Spec\n\nBody.\n"))
+    }
+
+    func test_fileHolds_isFalseWhenSomethingElseChangedIt() throws {
+        let url = try scratchFile("# Spec\n\nEdited by something else.\n")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        XCTAssertFalse(MarkdownDocument.file(at: url, holds: "# Spec\n\nBody.\n"))
+    }
+
+    /// Unreadable is not "unchanged": the caller has a path for that, and
+    /// answering true here would silently swallow a reload.
+    func test_fileHolds_isFalseWhenTheFileCannotBeRead() {
+        let missing = FileManager.default.temporaryDirectory
+            .appendingPathComponent("markdown-prism-gone-\(UUID().uuidString).md")
+
+        XCTAssertFalse(MarkdownDocument.file(at: missing, holds: ""))
+    }
+
+    /// Saves reproduce the encoding a file was read in, so the comparison has to
+    /// decode rather than compare bytes — otherwise every save of a UTF-16 file
+    /// would look like an outside change.
+    func test_fileHolds_comparesTextRatherThanBytes() throws {
+        let url = try scratchFile("# Spec\n\nBody.\n", encoding: .utf16)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        XCTAssertTrue(MarkdownDocument.file(at: url, holds: "# Spec\n\nBody.\n"))
+    }
 }
