@@ -121,4 +121,8 @@ are generated from it.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE).
+
+The app bundles its parser, highlighter, maths and diagram libraries so it can
+render offline; those are redistributed under their own licences, listed in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
