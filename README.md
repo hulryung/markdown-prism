@@ -121,4 +121,4 @@ are generated from it.
 
 ## License
 
-MIT
+[MIT](LICENSE)
