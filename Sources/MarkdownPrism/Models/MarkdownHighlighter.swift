@@ -250,6 +250,22 @@ final class MarkdownHighlighter {
         textStorage.endEditing()
     }
 
+    /// Whether `location` sits inside a fenced code block.
+    ///
+    /// Asked by the editor before it lets the caret keep the code background it
+    /// inherited. Inside a fence, keeping it is right — the block continues.
+    /// After the closing backtick of an inline span it is not, and the span's
+    /// last character is a backtick, so the caret inherits from it every time.
+    func isInsideCodeBlock(_ text: String, at location: Int) -> Bool {
+        let fullRange = NSRange(location: 0, length: (text as NSString).length)
+        guard NSLocationInRange(location, fullRange) || location == fullRange.length else {
+            return false
+        }
+        return codeBlockRanges(in: text, range: fullRange).contains {
+            location > $0.location && location < $0.location + $0.length
+        }
+    }
+
     /// Fence ranges intersecting `range`, in ascending order.
     private func codeBlockRanges(in text: String, range: NSRange) -> [NSRange] {
         guard let codeBlockPattern else { return [] }

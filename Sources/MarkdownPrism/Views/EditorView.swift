@@ -177,6 +177,7 @@ struct EditorView: NSViewRepresentable {
             let editedRange = textView.selectedRange()
             parent.text = textView.string
             rebuildLineIndex(for: textView.string)
+            clearStrayCodeBackground(in: textView)
             scheduleHighlight(for: textView, editedRange: editedRange)
         }
 
@@ -275,6 +276,9 @@ struct EditorView: NSViewRepresentable {
                 let selectedRanges = textView.selectedRanges
                 self.highlighter.highlight(textStorage, in: editedRange)
                 textView.selectedRanges = selectedRanges
+                // Re-styling the paragraph resets the storage, not the caret's
+                // own attributes, which are what the next keystroke uses.
+                self.clearStrayCodeBackground(in: textView)
             }
             highlightWork = work
             DispatchQueue.main.asyncAfter(
@@ -296,6 +300,29 @@ struct EditorView: NSViewRepresentable {
             // styled regions (bold, headers, etc.) keeps the style instead of
             // flashing to plain until the next debounced re-highlight.
             textView.font = highlighter.baseFont
+        }
+
+        /// Stops the code background following the caret out of a code span.
+        ///
+        /// Inheriting the surrounding style is what keeps typing inside bold or
+        /// a heading from flashing plain, and those are carried by the font and
+        /// the foreground colour. The background is carried by code alone, and
+        /// an inline span ends on a backtick — so the caret sitting after one
+        /// inherits a background that belongs to the character behind it, and
+        /// hands it to everything typed next. Newlines included, which is why it
+        /// showed as a band across the whole line rather than behind the words.
+        ///
+        /// It has to be cleared eagerly rather than left to the re-highlight:
+        /// that only resets the paragraph the edit was in, so a background
+        /// carried into an earlier paragraph would never be reset at all.
+        ///
+        /// Inside a fenced block the inheritance is right and is left alone.
+        private func clearStrayCodeBackground(in textView: NSTextView) {
+            guard textView.typingAttributes[.backgroundColor] != nil else { return }
+            guard !highlighter.isInsideCodeBlock(textView.string, at: textView.selectedRange().location) else {
+                return
+            }
+            textView.typingAttributes.removeValue(forKey: .backgroundColor)
         }
 
         // MARK: - Search

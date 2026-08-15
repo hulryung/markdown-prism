@@ -215,4 +215,40 @@ private extension String {
     func utf16Distance(of substring: String) -> Int {
         (self as NSString).range(of: substring).location
     }
+
+    // MARK: - Where the caret may keep a code background
+
+    /// An inline span ends on a backtick, so the caret after one inherits a
+    /// background belonging to the character behind it — and hands it to
+    /// everything typed next, newlines included.
+    func test_isInsideCodeBlock_isFalseAfterAnInlineSpan() {
+        let text = "- `code` outside\n\ntext\n"
+        let highlighter = MarkdownHighlighter()
+
+        let afterClosingBacktick = (text as NSString).range(of: "`code`").upperBound
+        XCTAssertFalse(highlighter.isInsideCodeBlock(text, at: afterClosingBacktick))
+        XCTAssertFalse(highlighter.isInsideCodeBlock(text, at: (text as NSString).length))
+    }
+
+    /// Inside a fence the inheritance is right: the block continues, and
+    /// clearing it would flash every keystroke plain until the re-highlight.
+    func test_isInsideCodeBlock_isTrueWithinAFence() {
+        let text = "before\n\n```swift\nlet x = 1\n```\n\nafter\n"
+        let highlighter = MarkdownHighlighter()
+
+        let inside = (text as NSString).range(of: "let x = 1").location + 3
+        XCTAssertTrue(highlighter.isInsideCodeBlock(text, at: inside))
+    }
+
+    func test_isInsideCodeBlock_isFalseOutsideAnyCode() {
+        let text = "before\n\n```\nfenced\n```\n\nafter\n"
+        let highlighter = MarkdownHighlighter()
+
+        XCTAssertFalse(highlighter.isInsideCodeBlock(text, at: 2))
+        XCTAssertFalse(highlighter.isInsideCodeBlock(text, at: (text as NSString).range(of: "after").location))
+    }
+
+    func test_isInsideCodeBlock_handlesAnEmptyDocument() {
+        XCTAssertFalse(MarkdownHighlighter().isInsideCodeBlock("", at: 0))
+    }
 }
