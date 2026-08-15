@@ -114,7 +114,15 @@ Tests/MarkdownPrismTests/
 |------|------|
 | UI | No localization — the app is English-only while the site ships a Korean page. |
 | Testing | UI behaviour (menus, window lifecycle, drag and drop) is still only checked by hand; the renderer and the model layer are covered. |
-| Diff | Running as a `git difftool` (#10) is unfinished: reading the two versions git extracts works, showing them in exactly one window does not. The issue carries what was measured; start there rather than from the local `difftool-experiment` branch. |
+
+## Not pursued
+
+Running as a `git difftool` was tried and set down (#10, closed). Reading the
+two versions git extracts, and telling which is older, works; showing them in
+exactly one window does not, which turns on how `DocumentGroup` treats a launch
+that opens no document rather than on anything to do with diffing. The issue
+records what was measured about handing files to a sandboxed app that way, and
+the `difftool-experiment` branch holds the attempt as reference.
 
 ## Release
 
