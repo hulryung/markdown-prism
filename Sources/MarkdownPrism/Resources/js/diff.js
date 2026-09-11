@@ -40,7 +40,7 @@
   var BLOCK = {
     P: 1, DIV: 1, UL: 1, OL: 1, LI: 1, PRE: 1, BLOCKQUOTE: 1, TABLE: 1,
     THEAD: 1, TBODY: 1, TFOOT: 1, TR: 1, TD: 1, TH: 1, DL: 1, DT: 1, DD: 1,
-    H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1, HR: 1, DETAILS: 1, SECTION: 1
+    H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1, HR: 1, DETAILS: 1, SUMMARY: 1, SECTION: 1
   };
 
   /* A pair less alike than this is two different blocks, not one rewritten. */
@@ -134,16 +134,54 @@
 
   // --- Blocks ---
 
-  /* What two elements are compared by. Source lines are stripped: a block that
-     only moved down the document is still the same block. */
+  /* Source positions and the task-list plugin's random checkbox/label IDs are
+     rendering metadata. Keep real attributes (checked, href, start, authored
+     IDs) in the comparison, and leave the displayed tree's label links intact. */
   function signature(element) {
-    return element.outerHTML.replace(/ data-source-line="[^"]*"/g, '');
+    var copy = element.cloneNode(true);
+    var checkboxes = copy.querySelectorAll('input.task-list-item-checkbox[id]');
+    var generatedIDs = Object.create(null);
+    for (var i = 0; i < checkboxes.length; i++) {
+      var id = checkboxes[i].id;
+      if (!/^task-item--?\d+$/.test(id)) continue;
+      generatedIDs[id] = true;
+      checkboxes[i].removeAttribute('id');
+    }
+    var labels = copy.querySelectorAll('label.task-list-item-label[for]');
+    for (var j = 0; j < labels.length; j++) {
+      if (generatedIDs[labels[j].htmlFor]) labels[j].removeAttribute('for');
+    }
+    return copy.outerHTML.replace(/ data-source-line="[^"]*"/g, '');
   }
 
   function elementChildren(element) {
     var result = [];
     var children = element.children;
     for (var i = 0; i < children.length; i++) result.push(children[i]);
+    return result;
+  }
+
+  /* A tight list item can contain text and emphasis directly beside a nested
+     list. Looking only at .children silently drops that text. Group inline
+     runs into blocks so both the item body and its nested list can be compared
+     independently, including when a nested list is added or removed. */
+  function contentBlocks(element) {
+    var result = [];
+    var inline = document.createElement('div');
+    function flush() {
+      if (inline.children.length || inline.textContent.trim()) result.push(inline);
+      inline = document.createElement('div');
+    }
+    var nodes = element.childNodes;
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].nodeType === 1 && BLOCK[nodes[i].tagName]) {
+        flush();
+        result.push(nodes[i]);
+      } else {
+        inline.appendChild(nodes[i].cloneNode(true));
+      }
+    }
+    flush();
     return result;
   }
 
@@ -213,9 +251,13 @@
 
     if (hasBlockChildren(oldElement) || hasBlockChildren(newElement)) {
       shell.appendChild(
-        mergeChildren(elementChildren(oldElement), elementChildren(newElement), depth + 1)
+        mergeChildren(contentBlocks(oldElement), contentBlocks(newElement), depth + 1)
       );
-      shell.classList.add(CLASSES.block, CLASSES.changed);
+      // Descendant edits belong to those descendants. Mark the whole container
+      // only for its own semantic change, such as an ordered list's start value.
+      if (signature(oldElement.cloneNode(false)) !== signature(newElement.cloneNode(false))) {
+        shell.classList.add(CLASSES.block, CLASSES.changed);
+      }
       return shell;
     }
 

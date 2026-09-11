@@ -456,6 +456,373 @@ final class PreviewRendererTests: XCTestCase {
         XCTAssertEqual(result["insertions"] as? Int, 1)
     }
 
+    // Issue #13: word-level assertions alone missed whole-list markers and
+    // false changes caused by the task-list plugin's generated checkbox IDs.
+    private func listDiffResults(_ script: String, in shell: Shell = .app) throws -> [[String: Any]] {
+        let json = try XCTUnwrap(try render("", in: shell, settleFor: 0.1, then: script) as? String)
+        return try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]]
+        )
+    }
+
+    func test_listDiffUnchangedContent_marksNothingEvenAfterLineShifts() throws {
+        let probe = #"""
+        (function () {
+          var lists = [
+            '- Alpha\n- Beta\n',
+            '1. Alpha\n2. Beta\n',
+            '- [ ] Alpha\n- [x] Beta\n',
+            '1. Outer **label**\n   - [ ] Nested task\n2. Other item\n',
+            '- Outer label\n  - [x] Nested task\n- Other item\n'
+          ];
+          return JSON.stringify(lists.map(function (list) {
+            window.renderDiff(list, list);
+            var unchanged = document.querySelectorAll('#content .diff-block').length;
+            var count = window.changeSummary().count;
+            window.renderDiff('Intro.\n\n' + list, 'Intro.\n\nInserted paragraph.\n\n' + list);
+            return {
+              markdown: list, unchanged: unchanged, count: count,
+              shiftedListMarks: document.querySelectorAll('#content li.diff-block, #content ul.diff-block, #content ol.diff-block').length,
+              shiftedChanges: window.changeSummary().count
+            };
+          }));
+        })()
+        """#
+        for shell in [Shell.app, .quickLook] {
+            for result in try listDiffResults(probe, in: shell) {
+                let context = "\(shell): \(result["markdown"] ?? "")"
+                XCTAssertEqual(result["unchanged"] as? Int, 0, context)
+                XCTAssertEqual(result["count"] as? Int, 0, context)
+                XCTAssertEqual(result["shiftedListMarks"] as? Int, 0, context)
+                XCTAssertEqual(result["shiftedChanges"] as? Int, 1, context)
+            }
+        }
+    }
+
+    func test_listDiffSeparatedEdits_scopeMarkersNavigationAndRulerToItems() throws {
+        let probe = #"""
+        (function () {
+          var formats = [
+            ['- ', '\n'], ['1. ', '\n'], ['- [ ] ', '\n'],
+            ['1. ', '\n\n'], ['   - ', '\n']
+          ];
+          return JSON.stringify(formats.map(function (format) {
+            var before = ['Alpha item', 'Beta item', 'Gamma item', 'Delta item'];
+            var after = ['Alpha item edited', 'Beta item', 'Gamma item', 'Delta item edited'];
+            function markdown(items) {
+              return items.map(function (item) { return format[0] + item; }).join(format[1]) + '\n';
+            }
+            window.renderDiff(markdown(before), markdown(after));
+            var c = document.getElementById('content');
+            var stops = [];
+            for (var i = 0; i < 3; i++) {
+              window.nextChange();
+              stops.push(c.querySelector('.diff-change-current').textContent.trim());
+            }
+            window.previousChange();
+            var marked = Array.from(c.querySelectorAll('.diff-block'));
+            var ticks = Array.from(document.querySelectorAll('#diff-ruler .diff-ruler-tick'));
+            var documentHeight = document.documentElement.scrollHeight;
+            return {
+              count: window.changeSummary().count, ticks: ticks.length, stops: stops,
+              previous: c.querySelector('.diff-change-current').textContent.trim(),
+              listMarks: c.querySelectorAll('ul.diff-block, ol.diff-block').length,
+              marked: marked.length,
+              unchangedItemMarks: Array.from(c.querySelectorAll('li')).slice(1, 3).filter(function (li) {
+                return li.matches('.diff-block') || li.querySelector('.diff-block');
+              }).length,
+              heightsMatch: ticks.length === marked.length && ticks.every(function (tick, index) {
+                return Math.abs(parseFloat(tick.style.height) * documentHeight / 100 - marked[index].getBoundingClientRect().height) < 1;
+              })
+            };
+          }));
+        })()
+        """#
+        for result in try listDiffResults(probe) {
+            XCTAssertEqual(result["count"] as? Int, 2)
+            XCTAssertEqual(result["ticks"] as? Int, 2)
+            XCTAssertEqual(result["listMarks"] as? Int, 0)
+            XCTAssertEqual(result["marked"] as? Int, 2)
+            XCTAssertEqual(result["unchangedItemMarks"] as? Int, 0)
+            XCTAssertEqual(result["heightsMatch"] as? Bool, true)
+            XCTAssertEqual(result["stops"] as? [String], ["Alpha item edited", "Delta item edited", "Alpha item edited"])
+            XCTAssertEqual(result["previous"] as? String, "Delta item edited")
+        }
+    }
+
+    func test_listDiffAdjacentEdits_formOneNavigationStop() throws {
+        for separator in ["\n", "\n\n"] {
+            let before = ["1. Alpha item", "2. Beta item", "3. Gamma item"].joined(separator: separator)
+            let after = ["1. Alpha item edited", "2. Beta item edited", "3. Gamma item"].joined(separator: separator)
+            let result = try changes(after, comparedWith: before)
+            XCTAssertEqual(result["count"] as? Int, 1)
+            XCTAssertEqual(result["ticks"] as? Int, 1)
+        }
+    }
+
+    func test_listDiffInsertedAndRemovedItems_markOnlyThoseItems() throws {
+        let probe = #"""
+        (function () {
+          return JSON.stringify(['- ', '1. ', '- [ ] '].flatMap(function (prefix) {
+            var before = prefix + 'Alpha item\n' + prefix + 'Gamma item\n';
+            var after = prefix + 'Alpha item\n' + prefix + 'Beta item\n' + prefix + 'Gamma item\n';
+            return [[before, after, 'added'], [after, before, 'removed']].map(function (sample) {
+              window.renderDiff(sample[0], sample[1]);
+              var marked = Array.from(document.querySelectorAll('#content .diff-block'));
+              return {
+                count: window.changeSummary().count, marked: marked.length,
+                tag: marked[0] && marked[0].tagName,
+                expectedKind: marked[0] && marked[0].classList.contains('diff-block-' + sample[2]),
+                text: marked[0] && marked[0].textContent.trim(),
+                removedAnchors: document.querySelectorAll('#content .diff-block-removed[data-source-line], #content .diff-block-removed [data-source-line]').length,
+                linkedLabels: Array.from(document.querySelectorAll('#content label[for]')).every(function (label) {
+                  return !!document.getElementById(label.htmlFor);
+                })
+              };
+            });
+          }));
+        })()
+        """#
+        for result in try listDiffResults(probe) {
+            XCTAssertEqual(result["count"] as? Int, 1)
+            XCTAssertEqual(result["marked"] as? Int, 1)
+            XCTAssertEqual(result["tag"] as? String, "LI")
+            XCTAssertEqual(result["text"] as? String, "Beta item")
+            XCTAssertEqual(result["expectedKind"] as? Bool, true)
+            XCTAssertEqual(result["removedAnchors"] as? Int, 0)
+            XCTAssertEqual(result["linkedLabels"] as? Bool, true)
+        }
+    }
+
+    func test_listDiffSemanticChanges_remainVisible() throws {
+        let probe = #"""
+        (function () {
+          var samples = [
+            ['- [ ] Task\n', '- [x] Task\n', 'input:checked'],
+            ['- [Link](https://example.com/old)\n', '- [Link](https://example.com/new)\n', 'a[href="https://example.com/new"]'],
+            ['1. Alpha\n2. Beta\n', '3. Alpha\n4. Beta\n', 'ol[start="3"]'],
+            ['- <span id="old">Anchor</span>\n', '- <span id="new">Anchor</span>\n', 'span[id="new"]']
+          ];
+          return JSON.stringify(samples.map(function (sample) {
+            window.renderDiff(sample[0], sample[1]);
+            return {
+              count: window.changeSummary().count,
+              currentValue: !!document.querySelector('#content ' + sample[2])
+            };
+          }));
+        })()
+        """#
+        for result in try listDiffResults(probe) {
+            XCTAssertEqual(result["count"] as? Int, 1)
+            XCTAssertEqual(result["currentValue"] as? Bool, true)
+        }
+    }
+
+    func test_listDiffNestedEdits_preserveParentTextAndInlineMarkup() throws {
+        let probe = #"""
+        (function () {
+          var samples = [
+            ['1. Outer **label**\n   - [ ] Nested task\n2. Other item\n',
+             '1. Outer **label**\n   - [ ] Nested task edited\n2. Other item\n'],
+            ['- Outer **label**\n  - Nested item\n', '- Outer **label** edited\n  - Nested item\n']
+          ];
+          return JSON.stringify(samples.map(function (sample) {
+            var c = document.getElementById('content');
+            window.renderMarkdown(sample[1]);
+            var expected = c.innerText.replace(/\s+/g, ' ').trim();
+            window.renderDiff(sample[0], sample[1]);
+            return {
+              expected: expected, actual: c.innerText.replace(/\s+/g, ' ').trim(),
+              emphasis: c.querySelector('strong') && c.querySelector('strong').textContent,
+              count: window.changeSummary().count,
+              marked: c.querySelectorAll('.diff-block').length
+            };
+          }));
+        })()
+        """#
+        for result in try listDiffResults(probe) {
+            XCTAssertEqual(result["actual"] as? String, result["expected"] as? String)
+            XCTAssertEqual(result["emphasis"] as? String, "label")
+            XCTAssertEqual(result["count"] as? Int, 1)
+            XCTAssertEqual(result["marked"] as? Int, 1)
+        }
+    }
+
+    func test_listDiffGutters_preserveIndentationAndStayOutsideListMarkers() throws {
+        let probe = #"""
+        (function () {
+          var c = document.getElementById('content');
+          return JSON.stringify(['- ', '1. ', '- [ ] '].map(function (prefix) {
+            var before = prefix + 'Alpha item\n' + prefix + 'Beta item\n';
+            var after = prefix + 'Alpha item edited\n' + prefix + 'Beta item\n';
+            window.renderMarkdown(after);
+            var plainX = c.querySelector('li').getBoundingClientRect().left;
+            var plainPadding = getComputedStyle(c.querySelector('ul,ol')).paddingLeft;
+            window.renderDiff(before, after);
+            var item = c.querySelector('li');
+            var gutter = document.querySelector('#diff-gutter .diff-gutter-mark');
+            var mark = c.querySelector('.diff-block');
+            var gutterRect = gutter && gutter.getBoundingClientRect();
+            var markRect = mark && mark.getBoundingClientRect();
+            var listLeft = c.querySelector('ul,ol').getBoundingClientRect().left;
+            var result = {
+              plainX: plainX, diffX: item.getBoundingClientRect().left,
+              plainPadding: plainPadding, diffPadding: getComputedStyle(c.querySelector('ul,ol')).paddingLeft,
+              gutterOutside: !!gutterRect && gutterRect.right <= listLeft,
+              gutterMatchesItem: !!gutterRect && Math.abs(gutterRect.top - markRect.top) < 1 && Math.abs(gutterRect.height - markRect.height) < 1
+            };
+            window.renderMarkdown(after);
+            var strip = document.getElementById('diff-gutter');
+            result.cleared = !strip || strip.style.display === 'none' || strip.children.length === 0;
+            return result;
+          }));
+        })()
+        """#
+        for result in try listDiffResults(probe) {
+            XCTAssertEqual(result["diffX"] as? Double, result["plainX"] as? Double)
+            XCTAssertEqual(result["diffPadding"] as? String, result["plainPadding"] as? String)
+            XCTAssertEqual(result["gutterOutside"] as? Bool, true)
+            XCTAssertEqual(result["gutterMatchesItem"] as? Bool, true)
+            XCTAssertEqual(result["cleared"] as? Bool, true)
+        }
+    }
+
+    func test_listDiffWholeListAdditionAndRemoval_usesOneMarker() throws {
+        let probe = #"""
+        (function () {
+          var list = '- [ ] Alpha\n- [x] Beta\n';
+          return JSON.stringify([['', list, 'added'], [list, '', 'removed']].map(function (sample) {
+            window.renderDiff(sample[0], sample[1]);
+            var c = document.getElementById('content');
+            return {
+              count: window.changeSummary().count,
+              marks: c.querySelectorAll('.diff-block').length,
+              wholeList: !!c.querySelector('ul.diff-block-' + sample[2]),
+              items: c.querySelectorAll('li').length,
+              gutters: document.querySelectorAll('#diff-gutter .diff-gutter-mark').length
+            };
+          }));
+        })()
+        """#
+        for result in try listDiffResults(probe) {
+            XCTAssertEqual(result["count"] as? Int, 1)
+            XCTAssertEqual(result["marks"] as? Int, 1)
+            XCTAssertEqual(result["wholeList"] as? Bool, true)
+            XCTAssertEqual(result["items"] as? Int, 2)
+            XCTAssertEqual(result["gutters"] as? Int, 1)
+        }
+    }
+
+    func test_listDiffMermaidReplacement_keepsMarkersAfterAsyncRendering() throws {
+        let before = "- Diagram:\n  ```mermaid\n  graph LR\n    A --> B\n  ```\n"
+        let after = before.replacingOccurrences(of: "A --> B", with: "A --> C")
+        let encodedBefore = try XCTUnwrap(String(data: JSONEncoder().encode(before), encoding: .utf8))
+        let encodedAfter = try XCTUnwrap(String(data: JSONEncoder().encode(after), encoding: .utf8))
+        let probe = """
+        (function () {
+          function census() {
+            var c = document.getElementById('content');
+            return {
+              count: window.changeSummary().count,
+              removed: c.querySelectorAll('.diff-block-removed svg').length,
+              added: c.querySelectorAll('.diff-block-added svg').length,
+              listMarks: c.querySelectorAll('ul.diff-block, li.diff-block').length,
+              removedAnchors: c.querySelectorAll('.diff-block-removed[data-source-line]').length
+            };
+          }
+          var fresh = census();
+          window.renderDiff(\(encodedBefore), \(encodedAfter));
+          return JSON.stringify([fresh, census()]);
+        })()
+        """
+        let json = try XCTUnwrap(try render(after, comparedWith: before, then: probe) as? String)
+        let results = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Int]]
+        )
+        for result in results {
+            XCTAssertEqual(result["count"], 1)
+            XCTAssertEqual(result["removed"], 1)
+            XCTAssertEqual(result["added"], 1)
+            XCTAssertEqual(result["listMarks"], 0)
+            XCTAssertEqual(result["removedAnchors"], 0)
+        }
+    }
+
+    func test_listDiffLayoutChanges_repositionGutterAndRuler() throws {
+        // WebKit pauses animation frames in a detached view. Give this one
+        // layout test a window so it exercises real ResizeObserver/frame timing.
+        let application = NSApplication.shared
+        let previousPolicy = application.activationPolicy()
+        application.setActivationPolicy(.accessory)
+        // XCTest runs the Foundation loop, not NSApplication's event loop.
+        // Deliver window visibility events so WebKit resumes animation frames.
+        let events = Timer.scheduledTimer(withTimeInterval: 0.01, repeats: true) { _ in
+            while let event = application.nextEvent(matching: .any, until: .distantPast,
+                                                     inMode: .default, dequeue: true) {
+                application.sendEvent(event)
+            }
+            application.updateWindows()
+        }
+        let window = NSWindow(contentRect: loader.webView.frame, styleMask: .borderless,
+                              backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = loader.webView
+        window.orderFront(nil)
+        defer {
+            events.invalidate()
+            window.orderOut(nil)
+            window.contentView = nil
+            application.setActivationPolicy(previousPolicy)
+        }
+        application.activate(ignoringOtherApps: true)
+        let before = "1. Alpha item with enough words to wrap when the preview becomes narrow.\n2. Beta item\n3. Gamma item\n"
+        let after = before.replacingOccurrences(of: "Gamma item", with: "Gamma item edited")
+        _ = try render(after, comparedWith: before, then: "1")
+
+        let finished = expectation(description: "layout and overlays updated")
+        var results: [[String: Bool]]?
+        var scriptError: Error?
+        loader.webView.callAsyncJavaScript(#"""
+        var results = [];
+        var content = document.getElementById('content');
+        var changes = [
+          function () { window.setTypography('Georgia', 23); },
+          function () { content.style.width = '320px'; },
+          function () { content.style.paddingTop = '80px'; },
+          function () { content.style.width = ''; window.setFullWidth(true); }
+        ];
+        for (var change of changes) {
+          change();
+          // ResizeObserver delivers after layout and schedules the next frame.
+          for (var i = 0; i < 3; i++) await new Promise(requestAnimationFrame);
+          var block = content.querySelector('.diff-block').getBoundingClientRect();
+          var gutter = document.querySelector('#diff-gutter .diff-gutter-mark').getBoundingClientRect();
+          var tick = document.querySelector('#diff-ruler .diff-ruler-tick');
+          var height = document.documentElement.scrollHeight;
+          results.push({
+            top: Math.abs(gutter.top - block.top) < 1,
+            height: Math.abs(gutter.height - block.height) < 1,
+            left: Math.abs(gutter.left - (content.getBoundingClientRect().left + parseFloat(getComputedStyle(content).paddingLeft) - 16)) < 1,
+            ruler: Math.abs(parseFloat(tick.style.top) * height / 100 - (block.top + window.scrollY)) < 1
+          });
+        }
+        return results;
+        """#, arguments: [:], in: nil, in: .page) { result in
+            switch result {
+            case .success(let value): results = value as? [[String: Bool]]
+            case .failure(let error): scriptError = error
+            }
+            finished.fulfill()
+        }
+        wait(for: [finished], timeout: 15)
+        XCTAssertNil(scriptError)
+        let checks = try XCTUnwrap(results)
+        XCTAssertEqual(checks.count, 4)
+        for (index, check) in checks.enumerated() {
+            XCTAssertTrue(check.values.allSatisfy { $0 }, "Layout change \(index): \(check)")
+        }
+    }
+
     /// Word-diffing a code fence would scramble it, and a Mermaid source block
     /// only renders if it reaches the renderer intact.
     func test_diffOfAnEditedCodeFence_replacesTheWholeBlock() throws {

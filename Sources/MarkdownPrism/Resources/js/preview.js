@@ -132,6 +132,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
       var holder = document.createElement('div');
       holder.dataset.mermaidSrc = src;
+      // The diagram replaces the fence, including its diff identity. Otherwise
+      // item-level changes disappear from navigation once Mermaid finishes.
+      holder.className = parentPre.className;
       // Carry the source line across, or the diagram becomes a hole in the
       // line map that scroll syncing interpolates over.
       var sourceLine = parentPre.getAttribute('data-source-line');
@@ -141,7 +144,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (mermaidCache.has(src)) {
         holder.innerHTML = mermaidCache.get(src);
       } else {
-        holder.className = 'mermaid';
+        holder.classList.add('mermaid');
         holder.textContent = src;
         toRender.push(holder);
       }
@@ -462,6 +465,7 @@ document.addEventListener('DOMContentLoaded', function () {
     } else {
       root.style.removeProperty('--body-size');
     }
+    scheduleRulerRefresh();
   };
 
   // --- Content width toggle ---
@@ -472,6 +476,7 @@ document.addEventListener('DOMContentLoaded', function () {
     } else {
       content.classList.remove('full-width');
     }
+    scheduleRulerRefresh();
   };
 
   window.findInPreview = findInPreview;
@@ -481,13 +486,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // --- Moving between changes ---
   //
-  // A change is a contiguous run of marked blocks — the unit git calls a hunk.
-  // Consecutive marked siblings count as one stop, so a removed paragraph and
-  // the one that replaced it do not ask to be visited twice.
+  // A change is a contiguous run of marked blocks. Unchanged list items split
+  // runs just like unchanged paragraphs; containers do not hide their edits.
 
   var _changes = [];
   var _currentChange = -1;
   var _ruler = null;
+  var _gutter = null;
 
   function diffClasses() {
     return window.MarkdownDiff.classes;
@@ -495,21 +500,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function collectChanges() {
     var blockClass = diffClasses().block;
-    var children = document.getElementById('content').children;
     var groups = [];
     var run = null;
 
-    for (var i = 0; i < children.length; i++) {
-      if (children[i].classList.contains(blockClass)) {
+    function visit(element) {
+      if (element.classList.contains(blockClass)) {
         if (!run) {
           run = [];
           groups.push(run);
         }
-        run.push(children[i]);
-      } else {
+        run.push(element);
+        // Whole additions/removals and container-attribute changes already
+        // cover their descendants; visiting them again would duplicate stops.
+        return;
+      }
+      if (!element.querySelector('.' + blockClass)) {
         run = null;
+        return;
+      }
+      var nodes = element.childNodes;
+      for (var i = 0; i < nodes.length; i++) {
+        if (nodes[i].nodeType === 1) visit(nodes[i]);
+        else if (nodes[i].nodeType === 3 && nodes[i].textContent.trim()) run = null;
       }
     }
+    visit(document.getElementById('content'));
     return groups;
   }
 
@@ -589,13 +604,27 @@ document.addEventListener('DOMContentLoaded', function () {
   function renderRuler() {
     var element = rulerElement();
     element.textContent = '';
+    if (!_gutter) {
+      _gutter = document.createElement('div');
+      _gutter.id = 'diff-gutter';
+      _gutter.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(_gutter);
+    }
+    _gutter.textContent = '';
 
     if (_changes.length === 0) {
       element.style.display = 'none';
+      _gutter.style.display = 'none';
       return;
     }
     element.style.display = 'block';
+    _gutter.style.display = 'block';
 
+    // Draw in the document margin, outside list numbers and checkboxes, without
+    // changing any content padding, margins, or table/list layout.
+    var content = document.getElementById('content');
+    var gutterLeft = content.getBoundingClientRect().left + window.scrollX +
+      parseFloat(getComputedStyle(content).paddingLeft) - 16;
     var documentHeight = document.documentElement.scrollHeight || 1;
     for (var i = 0; i < _changes.length; i++) {
       var group = _changes[i];
@@ -610,6 +639,16 @@ document.addEventListener('DOMContentLoaded', function () {
       tick.style.height = (height / documentHeight * 100) + '%';
       tick.setAttribute('data-change-index', String(i));
       element.appendChild(tick);
+
+      for (var j = 0; j < group.length; j++) {
+        var rect = group[j].getBoundingClientRect();
+        var mark = document.createElement('div');
+        mark.className = 'diff-gutter-mark diff-gutter-' + changeKind([group[j]]);
+        mark.style.left = gutterLeft + 'px';
+        mark.style.top = (rect.top + window.scrollY) + 'px';
+        mark.style.height = rect.height + 'px';
+        _gutter.appendChild(mark);
+      }
     }
     markCurrentTick();
   }
@@ -641,19 +680,25 @@ document.addEventListener('DOMContentLoaded', function () {
       _ruler.textContent = '';
       _ruler.style.display = 'none';
     }
+    if (_gutter) {
+      _gutter.textContent = '';
+      _gutter.style.display = 'none';
+    }
   }
 
-  // Ticks are placed as a fraction of the document, and both the fraction and
-  // the document change when the pane is resized.
+  // Images, fonts, and width changes can move items without a new diff. The
+  // overlays live outside #content, so measuring them cannot resize this target.
   var rulerRefreshPending = false;
-  window.addEventListener('resize', function () {
+  function scheduleRulerRefresh() {
     if (_changes.length === 0 || rulerRefreshPending) return;
     rulerRefreshPending = true;
     window.requestAnimationFrame(function () {
       rulerRefreshPending = false;
       renderRuler();
     });
-  });
+  }
+  window.addEventListener('resize', scheduleRulerRefresh);
+  new ResizeObserver(scheduleRulerRefresh).observe(document.getElementById('content'), { box: 'border-box' });
 
   window.nextChange = nextChange;
   window.previousChange = previousChange;

@@ -364,9 +364,8 @@ mark.search-highlight.search-highlight-current {
 /* Rich diff
    A block that was added or removed outright is tinted and carries a rule in
    the margin; a block that survived an edit keeps its own styling and marks
-   only the words that changed. The gutter is drawn with a negative margin that
-   the border and padding add back up to, so a changed paragraph's text still
-   lines up with the paragraphs around it. */
+   only the words that changed. The gutter is a separate overlay so marking a
+   list never changes its indentation or overlaps its numbers and checkboxes. */
 #content .diff-block-added {
     background-color: #e6ffec;
 }
@@ -375,23 +374,19 @@ mark.search-highlight.search-highlight-current {
     background-color: #ffebe9;
 }
 
-#content > .diff-block {
-    padding: 2px 8px 2px 12px;
-    margin-left: -16px;
-    border-left: 4px solid transparent;
-    border-radius: 0 4px 4px 0;
+#diff-gutter {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
 }
 
-#content > .diff-block-added {
-    border-left-color: #2da44e;
-}
-
-#content > .diff-block-removed {
-    border-left-color: #cf222e;
-}
-
-#content > .diff-block-changed {
-    border-left-color: #d4a72c;
+#diff-gutter .diff-gutter-mark {
+    position: absolute;
+    width: 4px;
+    border-radius: 2px;
 }
 
 #content ins.diff-words-added,
@@ -449,15 +444,18 @@ mark.search-highlight.search-highlight-current {
     pointer-events: auto;
 }
 
-#diff-ruler .diff-ruler-added {
+#diff-ruler .diff-ruler-added,
+#diff-gutter .diff-gutter-added {
     background-color: #2da44e;
 }
 
-#diff-ruler .diff-ruler-removed {
+#diff-ruler .diff-ruler-removed,
+#diff-gutter .diff-gutter-removed {
     background-color: #cf222e;
 }
 
-#diff-ruler .diff-ruler-changed {
+#diff-ruler .diff-ruler-changed,
+#diff-gutter .diff-gutter-changed {
     background-color: #d4a72c;
 }
 
@@ -472,15 +470,18 @@ mark.search-highlight.search-highlight-current {
         outline-color: #58a6ff;
     }
 
-    #diff-ruler .diff-ruler-added {
+    #diff-ruler .diff-ruler-added,
+    #diff-gutter .diff-gutter-added {
         background-color: #3fb950;
     }
 
-    #diff-ruler .diff-ruler-removed {
+    #diff-ruler .diff-ruler-removed,
+    #diff-gutter .diff-gutter-removed {
         background-color: #f85149;
     }
 
-    #diff-ruler .diff-ruler-changed {
+    #diff-ruler .diff-ruler-changed,
+    #diff-gutter .diff-gutter-changed {
         background-color: #d29922;
     }
 
@@ -490,18 +491,6 @@ mark.search-highlight.search-highlight-current {
 
     #content .diff-block-removed {
         background-color: rgba(248, 81, 73, 0.15);
-    }
-
-    #content > .diff-block-added {
-        border-left-color: #3fb950;
-    }
-
-    #content > .diff-block-removed {
-        border-left-color: #f85149;
-    }
-
-    #content > .diff-block-changed {
-        border-left-color: #d29922;
     }
 
     #content ins.diff-words-added {
