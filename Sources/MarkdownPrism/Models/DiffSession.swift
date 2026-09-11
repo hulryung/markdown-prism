@@ -48,7 +48,7 @@ final class DiffSession: ObservableObject {
     @Published private(set) var state: State = .off
     @Published private(set) var baseline: DiffBaseline = .off
 
-    private let access: RepositoryGranting
+    private let access: FolderGranting
     private let open: (URL) throws -> DiffSource
     /// Reads are asynchronous and the reader can switch comparisons while one is
     /// in flight, so results carry the request they answer.
@@ -58,10 +58,10 @@ final class DiffSession: ObservableObject {
     /// the signature because a default argument is evaluated at the call site,
     /// which is not necessarily on the main actor.
     init(
-        access: RepositoryGranting? = nil,
+        access: FolderGranting? = nil,
         open: @escaping (URL) throws -> DiffSource = { try GitRepository.discover(containing: $0) }
     ) {
-        self.access = access ?? RepositoryAccess.shared
+        self.access = access ?? FolderAccess.shared
         self.open = open
     }
 
@@ -117,7 +117,7 @@ final class DiffSession: ObservableObject {
 
     /// Asks for the repository folder, then loads if it was granted.
     func requestAccess(for fileURL: URL, text: String) {
-        guard access.requestGrant(containing: fileURL) else { return }
+        guard access.requestGrant(containing: fileURL, purpose: .repository) else { return }
         reload(for: fileURL, text: text)
     }
 

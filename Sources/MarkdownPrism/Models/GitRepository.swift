@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Nothing here knows about the sandbox or the view layer, which is what keeps
 /// it testable against a scratch repository. Earning the right to reach a
-/// repository at all is `RepositoryAccess`'s job.
+/// repository at all is `FolderAccess`'s job.
 struct GitRepository {
     /// A stored version of a file a diff can be taken against.
     ///

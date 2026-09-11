@@ -22,7 +22,7 @@ final class DiffSessionTests: XCTestCase {
         func headSummary() -> String? { summary }
     }
 
-    private final class Grant: RepositoryGranting {
+    private final class Grant: FolderGranting {
         var isGranted: Bool
         var grantsWhenAsked = true
         private(set) var requests = 0
@@ -33,7 +33,11 @@ final class DiffSessionTests: XCTestCase {
 
         func activateGrant(containing fileURL: URL) -> Bool { isGranted }
 
-        func requestGrant(containing fileURL: URL) -> Bool {
+        func requestGrant(containing fileURL: URL, purpose: FolderAccess.Purpose) -> Bool {
+            guard case .repository = purpose else {
+                XCTFail("Git comparisons should request repository access")
+                return false
+            }
             requests += 1
             isGranted = grantsWhenAsked
             return isGranted

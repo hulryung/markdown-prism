@@ -293,35 +293,17 @@ struct PreviewView: NSViewRepresentable {
             DispatchQueue.main.async { self.onSearchResults?(count, current) }
         }
 
-        private func handleLinkClick(href: String) {
-            if href.hasPrefix("http://") || href.hasPrefix("https://") {
-                if let url = URL(string: href) {
-                    NSWorkspace.shared.open(url)
-                }
-                return
+        func handleLinkClick(href: String) {
+            switch MarkdownLink.destination(for: href, relativeTo: fileURL) {
+            case .external(let url):
+                NSWorkspace.shared.open(url)
+            case .document(let url):
+                // An existence check can fail solely because access has not
+                // been granted. Let the document opener report and recover it.
+                DispatchQueue.main.async { self.onOpenFile?(url) }
+            case nil:
+                break
             }
-
-            if href.hasPrefix("mailto:") {
-                if let url = URL(string: href) {
-                    NSWorkspace.shared.open(url)
-                }
-                return
-            }
-
-            let ext = (href as NSString).pathExtension.lowercased()
-            if ext == "md" || ext == "markdown" {
-                guard let fileURL else { return }
-                let baseDir = fileURL.deletingLastPathComponent()
-                let resolved = URL(fileURLWithPath: href, relativeTo: baseDir).standardized
-                if FileManager.default.fileExists(atPath: resolved.path) {
-                    DispatchQueue.main.async {
-                        self.onOpenFile?(resolved)
-                    }
-                }
-                return
-            }
-
-            print("Ignored link click with unsupported scheme: \(href)")
         }
     }
 }

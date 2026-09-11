@@ -233,7 +233,7 @@ struct ContentView: View {
             scrollSync: scrollSync,
             changeRevision: changeRevision,
             fileURL: fileURL,
-            onOpenFile: { url in open(url) },
+            onOpenFile: { url in DocumentOpener.shared.open(url, linkedFrom: fileURL) },
             onSearchResults: { count, current in
                 searchMatchCount = count
                 searchCurrentMatch = current
@@ -389,17 +389,10 @@ struct ContentView: View {
         diff.reload(for: url, text: document.text)
     }
 
-    /// Opens a file in its own document window, which is also what gives the
-    /// sandbox access to it and adds it to Open Recent.
+    /// Document windows and Open Recent still belong to NSDocumentController;
+    /// the opener restores folder grants and handles recoverable read failures.
     private func open(_ url: URL) {
-        NSDocumentController.shared.openDocument(withContentsOf: url, display: true) { _, _, error in
-            guard let error else { return }
-            let alert = NSAlert()
-            alert.messageText = "Could not open \u{201C}\(url.lastPathComponent)\u{201D}"
-            alert.informativeText = error.localizedDescription
-            alert.alertStyle = .warning
-            alert.runModal()
-        }
+        DocumentOpener.shared.open(url)
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {

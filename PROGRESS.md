@@ -58,7 +58,7 @@ sandboxed build:
 
 - Opening `spec.md` grants that file alone, not the `.git` beside it. The
   reader hands over the repository folder once through an open panel and
-  `RepositoryAccess` keeps it as a security-scoped bookmark. The extension that
+  `FolderAccess` keeps it as a security-scoped bookmark. The extension that
   bookmark opens **is** inherited by the `git` child process — before
   `startAccessingSecurityScopedResource` the child gets `Operation not
   permitted`, after it the read succeeds.
@@ -68,6 +68,21 @@ sandboxed build:
   which does run, and stays subject to the sandbox. Anything that picks the
   shim passes the unsandboxed tests and fails in the shipped app, so
   `GitRepositoryTests` guards the choice.
+
+### Linked documents
+
+`MarkdownLink` resolves relative `.md` and `.markdown` URLs against the current
+document, decoding escaped filenames and removing queries/fragments from the
+file path. `DocumentOpener` restores a covering folder grant before asking
+`NSDocumentController` to open the file. Permission failures offer **Grant
+Access…**, followed by a folder picker and one retry. Missing or corrupt files
+keep their normal errors.
+
+`FolderAccess` shares grants between links and Git comparisons, including grants
+saved by older versions under `repositoryBookmarks`. Link prompts start in the
+current document's folder when it contains the target, otherwise in the target's
+folder; the reader can choose a parent. Cancelling leaves the current document
+alone. The folder grant is reused after relaunch without enabling Git diff.
 
 ## Layout
 
@@ -80,7 +95,8 @@ Sources/MarkdownPrism/
                TextFileFormat,
                FileWatcher, MarkdownHighlighter, ZoomState, LineIndex, ScrollSync,
                DefaultAppHelper,
-               GitRepository, RepositoryAccess, DiffSession, DiffBaseline, DiffStats
+               GitRepository, FolderAccess, DocumentOpener, MarkdownLink,
+               DiffSession, DiffBaseline, DiffStats
   Resources/   preview.html, preview-quicklook.html, js/, css/, vendor/
 Sources/QuickLookExtension/
 Tests/MarkdownPrismTests/

@@ -1,33 +1,51 @@
 import AppKit
 import Foundation
 
-/// The sandbox grant reading a repository depends on.
+/// The sandbox grant shared by document links and Git comparisons.
 ///
 /// Split out from the store below because a security-scoped bookmark cannot be
 /// forged, so this is the seam a test stands in at.
 @MainActor
-protocol RepositoryGranting {
-    /// Opens access to a repository folder granted earlier. False means the
+protocol FolderGranting {
+    /// Opens access to a folder granted earlier. False means the
     /// reader has not been asked yet.
     @discardableResult func activateGrant(containing fileURL: URL) -> Bool
     /// Asks the reader for the folder. False means they declined.
-    @discardableResult func requestGrant(containing fileURL: URL) -> Bool
+    @discardableResult func requestGrant(containing fileURL: URL, purpose: FolderAccess.Purpose) -> Bool
 }
 
-/// Keeps the sandbox out of the way of reading a Git repository.
+/// Remembers folders the reader has allowed the app to open.
 ///
 /// Opening `spec.md` grants this app that one file — not the `.git` directory
-/// beside it, and not the folder it sits in — so showing changes needs the
-/// reader to hand over the repository folder once. That grant is kept as a
-/// security-scoped bookmark and reused for every file in the repository, in
+/// beside it or another linked document — so those reads need the reader to
+/// hand over a folder once. That grant is kept as a security-scoped bookmark
+/// and reused for every file in the folder, in
 /// this run of the app and in later ones.
 @MainActor
-final class RepositoryAccess: RepositoryGranting {
-    static let shared = RepositoryAccess()
+final class FolderAccess: FolderGranting {
+    static let shared = FolderAccess()
+
+    enum Purpose {
+        case repository
+        case linkedDocument(source: URL?)
+
+        func suggestedFolder(containing fileURL: URL) -> URL {
+            switch self {
+            case .repository:
+                return GitRepository.likelyRoot(containing: fileURL)
+                    ?? fileURL.deletingLastPathComponent()
+            case .linkedDocument(let source):
+                if let folder = source?.deletingLastPathComponent(), folder.contains(fileURL) {
+                    return folder
+                }
+                return fileURL.deletingLastPathComponent()
+            }
+        }
+    }
 
     private let defaults: UserDefaults
     /// Folders whose extension has already been consumed in this process.
-    /// Access is never handed back: a granted repository stays readable until
+    /// Access is never handed back: a granted folder stays readable until
     /// the app quits, which is cheaper and less surprising than reopening the
     /// scope around every read.
     private var opened: Set<String> = []
@@ -37,12 +55,13 @@ final class RepositoryAccess: RepositoryGranting {
     }
 
     private enum Key {
+        // Keep grants made before document links shared this store.
         static let bookmarks = "repositoryBookmarks"
     }
 
     // MARK: - Using a grant
 
-    /// Opens access to the repository folder covering `fileURL`, if one was
+    /// Opens access to the folder covering `fileURL`, if one was
     /// granted before. False means the reader has not been asked yet.
     @discardableResult
     func activateGrant(containing fileURL: URL) -> Bool {
@@ -77,20 +96,20 @@ final class RepositoryAccess: RepositoryGranting {
         return true
     }
 
-    /// Whether a repository folder covering `fileURL` has already been granted.
+    /// Whether a folder covering `fileURL` has already been granted.
     func hasGrant(containing fileURL: URL) -> Bool {
         grant(containing: fileURL) != nil
     }
 
     // MARK: - Asking for a grant
 
-    /// Asks the reader for the repository folder holding `fileURL`.
+    /// Asks the reader for a folder holding `fileURL`.
     ///
     /// The panel is the only way a sandboxed app can widen its own reach, so
     /// this is a deliberate, explained prompt rather than something to retry
     /// quietly in the background.
     @discardableResult
-    func requestGrant(containing fileURL: URL) -> Bool {
+    func requestGrant(containing fileURL: URL, purpose: Purpose) -> Bool {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -98,28 +117,34 @@ final class RepositoryAccess: RepositoryGranting {
         panel.canCreateDirectories = false
         panel.prompt = "Grant Access"
 
-        // Opening at the repository rather than at the file's own folder, which
-        // for anything under a subdirectory means climbing back out before the
-        // panel is even useful. The root is only a guess — the reader can still
-        // go anywhere from here — but it is right nearly every time.
-        let root = GitRepository.likelyRoot(containing: fileURL)
-        panel.directoryURL = root ?? fileURL.deletingLastPathComponent()
-        panel.message = root.map { root in
-            """
-            Grant access to \u{201C}\(root.lastPathComponent)\u{201D} so Markdown Prism can read its \
-            history and show changes to \u{201C}\(fileURL.lastPathComponent)\u{201D}. It asks once per repository.
-            """
-        } ?? """
-            Choose the Git repository folder that contains \u{201C}\(fileURL.lastPathComponent)\u{201D}.
-            Markdown Prism reads its history to show changes, and remembers the folder so it only asks once.
-            """
+        // Git needs the repository root; links usually need only the current
+        // document's folder. The reader can choose a parent for a wider grant.
+        panel.directoryURL = purpose.suggestedFolder(containing: fileURL)
+        switch purpose {
+        case .repository:
+            let root = GitRepository.likelyRoot(containing: fileURL)
+            panel.message = root.map { root in
+                """
+                Grant access to \u{201C}\(root.lastPathComponent)\u{201D} so Markdown Prism can read its \
+                history and show changes to \u{201C}\(fileURL.lastPathComponent)\u{201D}. It asks once per repository.
+                """
+            } ?? """
+                Choose the Git repository folder that contains \u{201C}\(fileURL.lastPathComponent)\u{201D}.
+                Markdown Prism reads its history to show changes, and remembers the folder so it only asks once.
+                """
+        case .linkedDocument:
+            panel.message = """
+                Choose the folder containing \u{201C}\(fileURL.lastPathComponent)\u{201D}, or one of its parents.
+                Markdown Prism remembers your choice so links to other Markdown documents in that folder can open without asking again.
+                """
+        }
 
         guard panel.runModal() == .OK, let folder = panel.url else { return false }
 
         guard folder.contains(fileURL) else {
             let alert = NSAlert()
             alert.messageText = "That folder does not contain \u{201C}\(fileURL.lastPathComponent)\u{201D}"
-            alert.informativeText = "Choose the repository folder the file lives in, or one of its parents."
+            alert.informativeText = "Choose the folder the file lives in, or one of its parents."
             alert.alertStyle = .warning
             alert.runModal()
             return false
