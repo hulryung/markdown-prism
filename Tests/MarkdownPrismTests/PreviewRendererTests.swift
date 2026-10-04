@@ -188,6 +188,41 @@ final class PreviewRendererTests: XCTestCase {
         XCTAssertEqual(flags["mermaid"] as? Bool, true, "Mermaid")
     }
 
+    /// The vendored Mermaid is replaced wholesale on upgrade; one flowchart
+    /// rendering says little about the other diagram types it ships.
+    func test_commonMermaidDiagramTypes_renderInBothShells() throws {
+        let diagrams = [
+            "graph TD\n  A[Start] --> B{Choice}\n  B -->|yes| C[Done]\n  B -->|no| A",
+            "sequenceDiagram\n  Alice->>Bob: Hello\n  Bob-->>Alice: Hi",
+            "classDiagram\n  Animal <|-- Duck\n  Animal : +int age",
+            "stateDiagram-v2\n  [*] --> Idle\n  Idle --> Busy\n  Busy --> [*]",
+            "erDiagram\n  CUSTOMER ||--o{ ORDER : places",
+            "gantt\n  dateFormat YYYY-MM-DD\n  section Work\n  Task :a1, 2026-01-01, 3d",
+            "pie title Pets\n  \"Dogs\" : 3\n  \"Cats\" : 2"
+        ]
+        let markdown = diagrams.map { "```mermaid\n\($0)\n```\n" }.joined(separator: "\n")
+        let probe = """
+        (function () {
+          var c = document.getElementById('content');
+          return JSON.stringify({
+            rendered: c.querySelectorAll('[data-mermaid-src] > svg').length,
+            errors: c.querySelectorAll('svg .error-icon, svg .error-text').length
+          });
+        })()
+        """
+
+        for shell in [Shell.app, Shell.quickLook] {
+            let json = try XCTUnwrap(
+                try render(markdown, in: shell, settleFor: 4, then: probe) as? String
+            )
+            let result = try XCTUnwrap(
+                try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Int]
+            )
+            XCTAssertEqual(result["rendered"], diagrams.count, "\(shell.rawValue)")
+            XCTAssertEqual(result["errors"], 0, "\(shell.rawValue)")
+        }
+    }
+
     func test_scriptTagsInMarkdown_areStripped() throws {
         let value = try render(
             "Hello <script>window.pwned = true;</script> there\n",

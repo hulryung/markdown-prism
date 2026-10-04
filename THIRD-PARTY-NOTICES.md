@@ -12,19 +12,19 @@ package at the exact version shipped, rather than assumed.
 
 | Library | Version | Licence |
 |---|---|---|
-| [markdown-it](https://github.com/markdown-it/markdown-it) | 14.1.0 | MIT |
-| [markdown-it-emoji](https://github.com/markdown-it/markdown-it-emoji) | 3.0.0 | MIT |
+| [markdown-it](https://github.com/markdown-it/markdown-it) | 15.0.2 | MIT |
+| [markdown-it-emoji](https://github.com/markdown-it/markdown-it-emoji) | 3.1.0 | MIT |
 | [markdown-it-task-lists](https://github.com/revin/markdown-it-task-lists) | 2.1.1 [^1] | ISC |
-| [highlight.js](https://github.com/highlightjs/highlight.js) | 11.9.0 | BSD-3-Clause |
-| [KaTeX](https://github.com/KaTeX/KaTeX) | 0.16.11 | MIT |
-| [Mermaid](https://github.com/mermaid-js/mermaid) | 11.12.0 | MIT |
-| [DOMPurify](https://github.com/cure53/DOMPurify) | 3.3.3 | Apache-2.0 OR MPL-2.0 |
+| [highlight.js](https://github.com/highlightjs/highlight.js) | 11.12.0 | BSD-3-Clause |
+| [KaTeX](https://github.com/KaTeX/KaTeX) | 0.19.0 | MIT |
+| [Mermaid](https://github.com/mermaid-js/mermaid) | 12.1.0 | MIT |
+| [DOMPurify](https://github.com/cure53/DOMPurify) | 3.4.16 | Apache-2.0 OR MPL-2.0 |
 
 The `github.min.css` and `github-dark.min.css` themes are part of highlight.js
 and carry its licence. The `KaTeX_*.woff2` faces are part of KaTeX and carry
 its licence.
 
-Mermaid bundles its own copy of DOMPurify (3.2.6), so that licence applies to
+Mermaid bundles its own copy of DOMPurify (3.4.12), so that licence applies to
 the app twice over: once for the copy the preview loads directly, once for the
 copy inside Mermaid.
 
@@ -111,4 +111,4 @@ License 2.0.
 
 - Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
 - Mozilla Public License 2.0: https://www.mozilla.org/MPL/2.0/
-- As shipped: https://github.com/cure53/DOMPurify/blob/3.3.3/LICENSE
+- As shipped: https://github.com/cure53/DOMPurify/blob/3.4.16/LICENSE
