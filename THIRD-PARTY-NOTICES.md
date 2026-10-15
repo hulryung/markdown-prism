@@ -28,9 +28,9 @@ Mermaid bundles its own copy of DOMPurify (3.4.12), so that licence applies to
 the app twice over: once for the copy the preview loads directly, once for the
 copy inside Mermaid.
 
-[^1]: The package fetched was 2.1.1; the banner inside the file it ships still
-says 2.1.0. Recorded as fetched, with the discrepancy noted rather than
-silently resolved either way.
+[^1]: Vendored unminified with one change to the `labelAfter` label, which
+upstream builds from the item's raw source rather than its rendered tokens;
+the file's header describes it.
 
 ---
 

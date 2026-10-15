@@ -223,6 +223,55 @@ final class PreviewRendererTests: XCTestCase {
         }
     }
 
+    /// The task-list plugin's `labelAfter` label used to re-emit the item's
+    /// raw source after its rendered text, so a wrapped item showed every line
+    /// but its last twice and inline markup literally (#15).
+    func test_wrappedTaskItems_renderTheirTextOnce() throws {
+        let markdown = """
+        - [ ] Variant one: read it on the iPad,
+              and note whether this sentence shows once
+          - [x] Nested, **bold** and `code`
+        - [ ] Lazy continuation
+        continues here
+        """
+        let probe = """
+        (function () {
+          var items = document.querySelectorAll('#content li.task-list-item');
+          return JSON.stringify(Array.from(items).map(function (li) {
+            var label = li.querySelector(':scope > label.task-list-item-label');
+            var own = Array.from(li.childNodes).filter(function (n) {
+              return n.nodeType === 3 && n.textContent.trim();
+            }).length;
+            return {
+              text: (label ? label.textContent : '').replace(/\\s+/g, ' ').trim(),
+              strong: label ? label.querySelectorAll('strong').length : 0,
+              code: label ? label.querySelectorAll('code').length : 0,
+              strayText: own,
+              linked: !!(label && document.getElementById(label.htmlFor) === li.querySelector('input'))
+            };
+          }));
+        })()
+        """
+        for shell in [Shell.app, Shell.quickLook] {
+            let json = try XCTUnwrap(try render(markdown, in: shell, then: probe) as? String)
+            let items = try XCTUnwrap(
+                try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]]
+            )
+            XCTAssertEqual(items.count, 3, shell.rawValue)
+            XCTAssertEqual(items[0]["text"] as? String,
+                           "Variant one: read it on the iPad, and note whether this sentence shows once",
+                           shell.rawValue)
+            XCTAssertEqual(items[1]["text"] as? String, "Nested, bold and code", shell.rawValue)
+            XCTAssertEqual(items[1]["strong"] as? Int, 1, shell.rawValue)
+            XCTAssertEqual(items[1]["code"] as? Int, 1, shell.rawValue)
+            XCTAssertEqual(items[2]["text"] as? String, "Lazy continuation continues here", shell.rawValue)
+            for item in items {
+                XCTAssertEqual(item["strayText"] as? Int, 0, "text outside the label in \(shell.rawValue)")
+                XCTAssertEqual(item["linked"] as? Bool, true, shell.rawValue)
+            }
+        }
+    }
+
     func test_scriptTagsInMarkdown_areStripped() throws {
         let value = try render(
             "Hello <script>window.pwned = true;</script> there\n",
