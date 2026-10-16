@@ -19,6 +19,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             openWelcomeDocument()
         }
 
+        installTitleBarDoubleClickFix()
+
         // The saved theme has to land before the first window draws, or the app
         // flashes the system appearance and then corrects itself.
         AppSettings.shared.applyAppearance()
@@ -37,6 +39,52 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard !flag else { return true }
         NSDocumentController.shared.newDocument(nil)
         return false
+    }
+
+    /// Double-clicking the title bar does nothing over most of its width:
+    /// with a unified toolbar, the window title sits in a container view that
+    /// stretches from the traffic lights to the first toolbar item and keeps
+    /// double-clicks to itself instead of handing them to the title bar. Only
+    /// the thin strip above that container still zooms. The window gets the
+    /// system double-click action here instead.
+    private func installTitleBarDoubleClickFix() {
+        NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
+            guard event.clickCount == 2,
+                  let window = event.window,
+                  let frameView = window.contentView?.superview,
+                  let hit = frameView.hitTest(frameView.convert(event.locationInWindow, from: nil)),
+                  Self.isToolbarTitle(hit)
+            else { return event }
+            Self.performTitleBarDoubleClick(on: window)
+            return nil
+        }
+    }
+
+    /// Whether `view` is the toolbar's title (or a view inside it) rather than
+    /// a toolbar item, which must keep its own double-click.
+    private static func isToolbarTitle(_ view: NSView) -> Bool {
+        var current: NSView? = view
+        while let view = current {
+            let name = String(describing: type(of: view))
+            if name == "NSToolbarTitleView" { return true }
+            if name == "NSToolbarItemViewer" || view is NSButton { return false }
+            current = view.superview
+        }
+        return false
+    }
+
+    /// Mirrors System Settings > Desktop & Dock > "Double-click a window's
+    /// title bar to". Zoom covers both "Zoom" and "Fill": the standard zoom
+    /// frame of a document window is the full visible screen.
+    private static func performTitleBarDoubleClick(on window: NSWindow) {
+        switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
+        case "Minimize":
+            window.miniaturize(nil)
+        case "None":
+            break
+        default:
+            window.zoom(nil)
+        }
     }
 
     /// SwiftUI's DocumentGroup presents the Open panel when the app launches
