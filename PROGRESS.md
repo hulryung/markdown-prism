@@ -31,6 +31,15 @@ Native shell, web renderer:
   versions, unsaved-changes prompts, window tabs, per-window dirty state and an
   Open Recent that survives relaunch inside the sandbox all come from there
   rather than from hand-written code.
+- **Title bar**: `AppDelegate` catches a double-click whose hit view is the
+  unified toolbar's title and performs the system double-click action itself
+  (Zoom, Fill, Minimize or None from Desktop & Dock). On macOS 26 and later
+  the title container stretches from the traffic lights to the first toolbar
+  item and keeps double-clicks to itself, so only the thin strip above it
+  zoomed; Finder behaves the same way there. `.windowToolbarStyle(.expanded)`
+  also fixes it but splits the title bar into two rows, and `.unifiedCompact`,
+  `.toolbarTitleDisplayMode(.inline)` and a principal spacer do not help. The
+  event is swallowed so the strip that already worked does not act twice.
 - **Swift → JS**: markdown is JSON-encoded and passed to `window.renderMarkdown`,
   or to `window.renderDiff` with the version to mark it against.
 - **JS → Swift**: `WKScriptMessageHandler` for link clicks and preview scroll position.
@@ -129,7 +138,7 @@ Tests/MarkdownPrismTests/
 | Area | Item |
 |------|------|
 | UI | No localization — the app is English-only while the site ships a Korean page. |
-| Testing | UI behaviour (menus, window lifecycle, drag and drop) is still only checked by hand; the renderer and the model layer are covered. |
+| Testing | UI behaviour (menus, window lifecycle, drag and drop) is still only checked by hand; the renderer and the model layer are covered. The title-bar double-click fix was verified with synthetic mouse events against the title text, the empty title-bar area, the top strip and a toolbar button, but that harness is not in the repository. |
 
 ## Not pursued
 
@@ -173,6 +182,11 @@ change under `docs/` reaches the site only when someone runs:
 ```
 vercel deploy --prod
 ```
+
+The command can return before the production alias has moved: twice in a row
+the site still served the previous version right after it, and a second
+`vercel deploy --prod` brought the new one up. Check the hero line on the live
+page before calling a release done.
 
 The link that command needs lives in `.vercel/`, which is ignored — a fresh
 clone has to `vercel link` to the `markdown-prism` project under the personal
