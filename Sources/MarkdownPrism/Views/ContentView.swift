@@ -26,6 +26,8 @@ struct ContentView: View {
     @State private var replaceRevision = 0
     @State private var replaceAllRevision = 0
     @State private var changeRevision = 0
+    @State private var taskToggle: TaskListToggle.Request?
+    @State private var taskToggleRevision = 0
     @State private var changeCount = 0
     @State private var currentChange = 0
 
@@ -198,6 +200,8 @@ struct ContentView: View {
             replaceRevision: replaceRevision,
             replaceAllRevision: replaceAllRevision,
             scrollSync: scrollSync,
+            taskToggle: taskToggle,
+            taskToggleRevision: taskToggleRevision,
             onEscapePressed: isSearchVisible ? dismissSearch : nil
         )
         .frame(minWidth: 300)
@@ -241,9 +245,25 @@ struct ContentView: View {
             onChangesCounted: { count, current in
                 changeCount = count
                 currentChange = current
-            }
+            },
+            onTaskToggle: { line, checked in toggleTask(line: line, checked: checked) }
         )
         .frame(minWidth: 300)
+    }
+
+    /// A checkbox clicked in the preview edits the source line it came from.
+    /// With the editor on screen the edit goes through its text view so it
+    /// can be undone; without one the document is changed directly.
+    private func toggleTask(line: Int, checked: Bool) {
+        // A comparison of two stored revisions shows text that is not the
+        // editor's, so its lines describe nothing the click could edit.
+        if case .ready(let comparison) = diff.state, comparison.current != nil { return }
+        if showEditor {
+            taskToggle = TaskListToggle.Request(line: line, checked: checked)
+            taskToggleRevision += 1
+        } else if let edited = TaskListToggle.apply(to: document.text, line: line, checked: checked) {
+            document.text = edited
+        }
     }
 
     private func zoomIn() {

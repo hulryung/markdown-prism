@@ -21,6 +21,9 @@ struct PreviewView: NSViewRepresentable {
     var onOpenFile: ((URL) -> Void)?
     var onSearchResults: ((Int, Int) -> Void)?
     var onChangesCounted: ((Int, Int) -> Void)?
+    /// A rendered checkbox was clicked: the zero-based source line of its
+    /// item and the state it was set to.
+    var onTaskToggle: ((Int, Bool) -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -31,6 +34,7 @@ struct PreviewView: NSViewRepresentable {
         let handler = WeakScriptMessageHandler(delegate: context.coordinator)
         config.userContentController.add(handler, name: "linkClicked")
         config.userContentController.add(handler, name: "previewScrolled")
+        config.userContentController.add(handler, name: "taskToggled")
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.pageZoom = zoomScale
@@ -46,6 +50,7 @@ struct PreviewView: NSViewRepresentable {
         context.coordinator.onOpenFile = onOpenFile
         context.coordinator.onSearchResults = onSearchResults
         context.coordinator.onChangesCounted = onChangesCounted
+        context.coordinator.onTaskToggle = onTaskToggle
         context.coordinator.pendingChangeRevision = changeRevision
         context.coordinator.bind(to: scrollSync)
 
@@ -85,6 +90,7 @@ struct PreviewView: NSViewRepresentable {
         c.pendingChangeRevision = changeRevision
         c.fileURL = fileURL
         c.onOpenFile = onOpenFile
+        c.onTaskToggle = onTaskToggle
         c.onSearchResults = onSearchResults
         c.onChangesCounted = onChangesCounted
         c.bind(to: scrollSync)
@@ -114,6 +120,7 @@ struct PreviewView: NSViewRepresentable {
         var fileURL: URL?
         var onOpenFile: ((URL) -> Void)?
         var onSearchResults: ((Int, Int) -> Void)?
+        var onTaskToggle: ((Int, Bool) -> Void)?
         var onChangesCounted: ((Int, Int) -> Void)?
         var pendingChangeRevision = 0
         private var appliedChangeRevision = 0
@@ -163,6 +170,11 @@ struct PreviewView: NSViewRepresentable {
             case "previewScrolled":
                 guard let line = message.body as? NSNumber else { return }
                 scrollSync?.previewDidScroll(toLine: line.intValue)
+            case "taskToggled":
+                guard let body = message.body as? [String: Any],
+                      let line = body["line"] as? NSNumber,
+                      let checked = body["checked"] as? Bool else { return }
+                onTaskToggle?(line.intValue, checked)
             default:
                 break
             }

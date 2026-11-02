@@ -12,6 +12,10 @@ struct EditorView: NSViewRepresentable {
     let replaceRevision: Int
     let replaceAllRevision: Int
     let scrollSync: ScrollSyncBus
+    /// The latest checkbox click from the preview, applied once per revision
+    /// the same way a replace is, so it lands on the undo stack.
+    var taskToggle: TaskListToggle.Request?
+    var taskToggleRevision: Int = 0
     var onEscapePressed: (() -> Void)?
 
     func makeCoordinator() -> Coordinator {
@@ -104,6 +108,7 @@ struct EditorView: NSViewRepresentable {
         context.coordinator.appliedFontSize = fontSize
         context.coordinator.appliedFontFamily = fontFamily
         context.coordinator.handleReplaceIfNeeded(in: textView)
+        context.coordinator.handleTaskToggleIfNeeded(in: textView)
         context.coordinator.updateSearchHighlights(in: textView)
         context.coordinator.isEditingFromTextView = false
     }
@@ -462,6 +467,32 @@ struct EditorView: NSViewRepresentable {
                     guard let self, let textView else { return }
                     self.replaceAllMatches(in: textView)
                 }
+            }
+        }
+
+        // MARK: - Task toggles
+
+        private var appliedTaskToggleRevision = 0
+
+        func handleTaskToggleIfNeeded(in textView: NSTextView) {
+            let rev = parent.taskToggleRevision
+            guard rev != appliedTaskToggleRevision else { return }
+            appliedTaskToggleRevision = rev
+            guard let request = parent.taskToggle else { return }
+            DispatchQueue.main.async { [weak self, weak textView] in
+                guard let self, let textView else { return }
+                self.applyTaskToggle(request, in: textView)
+            }
+        }
+
+        private func applyTaskToggle(_ request: TaskListToggle.Request, in textView: NSTextView) {
+            guard let textStorage = textView.textStorage,
+                  let edit = TaskListToggle.edit(in: textStorage.string, line: request.line, checked: request.checked)
+            else { return }
+            if textView.shouldChangeText(in: edit.range, replacementString: edit.replacement) {
+                textStorage.replaceCharacters(in: edit.range, with: edit.replacement)
+                textView.didChangeText()
+                textView.undoManager?.setActionName(request.checked ? "Check Task" : "Uncheck Task")
             }
         }
 

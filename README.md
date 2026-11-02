@@ -12,7 +12,7 @@ A native macOS Markdown viewer & editor with live preview, Quick Look support, a
 - **Scroll Sync** — Editor and preview follow each other, both ways
 - **Line Numbers** — Gutter alongside the editor
 - **Tabs & Windows** — A document per window, merged into tabs when you want
-- **GFM Support** — Tables, task lists, strikethrough, autolinks
+- **GFM Support** — Tables, task lists (click a checkbox to tick it in the source), strikethrough, autolinks
 - **Syntax Highlighting** — 180+ languages via highlight.js
 - **LaTeX Math** — Inline (`$...$`) and block (`$$...$$`) math with KaTeX
 - **Mermaid Diagrams** — Flowcharts, sequence diagrams, and more

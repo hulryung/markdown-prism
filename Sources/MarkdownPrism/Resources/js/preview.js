@@ -111,8 +111,13 @@ document.addEventListener('DOMContentLoaded', function () {
   md.use(markdownitHeadingAnchor);
   md.use(markdownitSourceLines);
 
+  // Checkboxes are live only where a click can reach the document: the app
+  // listens for them, the Quick Look shell has no one to tell.
+  var canToggleTasks = !!(window.webkit && window.webkit.messageHandlers &&
+                          window.webkit.messageHandlers.taskToggled);
+
   if (window.markdownitTaskLists) {
-    md.use(window.markdownitTaskLists, { enabled: false, label: true, labelAfter: true });
+    md.use(window.markdownitTaskLists, { enabled: canToggleTasks, label: true, labelAfter: true });
   }
 
   if (window.markdownitEmoji) {
@@ -706,6 +711,25 @@ document.addEventListener('DOMContentLoaded', function () {
   window.changeSummary = function () {
     return { count: _changes.length, current: _currentChange + 1 };
   };
+
+  // A click on a rendered checkbox becomes an edit of the source line the
+  // item came from. The checkbox is left as the click set it; the re-render
+  // that follows the edit shows the same state from the document itself.
+  document.addEventListener('click', function (e) {
+    var box = e.target;
+    if (!box || box.tagName !== 'INPUT' || box.type !== 'checkbox' || !canToggleTasks) return;
+    var item = box.closest('li[data-source-line]');
+    if (!item) {
+      // A removed block in a comparison describes a line that no longer
+      // exists; there is nothing to edit.
+      e.preventDefault();
+      return;
+    }
+    window.webkit.messageHandlers.taskToggled.postMessage({
+      line: parseInt(item.getAttribute('data-source-line'), 10),
+      checked: box.checked
+    });
+  });
 
   // Intercept link clicks and delegate to native app
   document.addEventListener('click', function (e) {

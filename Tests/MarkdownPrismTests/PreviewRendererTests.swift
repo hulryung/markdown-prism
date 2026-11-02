@@ -25,8 +25,21 @@ final class PreviewRendererTests: XCTestCase {
     }
 
     private final class Loader: NSObject, WKNavigationDelegate {
-        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 900, height: 700))
+        let webView: WKWebView
         private var onLoad: (() -> Void)?
+
+        /// `userScript` runs before the page's own scripts, which is how a
+        /// test stands in for the app's message handlers.
+        init(userScript: String? = nil) {
+            let configuration = WKWebViewConfiguration()
+            if let userScript {
+                configuration.userContentController.addUserScript(
+                    WKUserScript(source: userScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+                )
+            }
+            webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 900, height: 700), configuration: configuration)
+            super.init()
+        }
 
         func load(_ url: URL, then onLoad: @escaping () -> Void) {
             self.onLoad = onLoad
@@ -270,6 +283,85 @@ final class PreviewRendererTests: XCTestCase {
                 XCTAssertEqual(item["linked"] as? Bool, true, shell.rawValue)
             }
         }
+    }
+
+    // MARK: - Task checkboxes
+
+    private static let taskHandlerStub = """
+    window.__toggles = [];
+    window.webkit = { messageHandlers: { taskToggled: {
+      postMessage: function (m) { window.__toggles.push(m); }
+    } } };
+    """
+
+    private static let taskMarkdown = """
+    Intro paragraph.
+
+    - [ ] **Ctrl+Up** — Mission Control
+    - [x] **Ctrl+Down** — Application windows
+      - [ ] nested
+    """
+
+    private static let clickCheckboxProbe = """
+    (function () {
+      var boxes = document.querySelectorAll('#content input[type=checkbox]');
+      boxes[0].click();
+      boxes[1].click();
+      boxes[2].click();
+      return JSON.stringify({
+        enabled: Array.from(boxes).map(function (b) { return !b.disabled; }),
+        toggles: window.__toggles || null,
+        checkedNow: Array.from(boxes).map(function (b) { return b.checked; })
+      });
+    })()
+    """
+
+    /// With the app listening, a click on a rendered checkbox reports the
+    /// item's source line and new state (#18).
+    func test_clickingACheckbox_reportsItsSourceLineAndState() throws {
+        loader = Loader(userScript: Self.taskHandlerStub)
+        let json = try XCTUnwrap(try render(Self.taskMarkdown, then: Self.clickCheckboxProbe) as? String)
+        let result = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+
+        XCTAssertEqual(result["enabled"] as? [Bool], [true, true, true])
+        let toggles = try XCTUnwrap(result["toggles"] as? [[String: Any]])
+        XCTAssertEqual(toggles.map { $0["line"] as? Int }, [2, 3, 4])
+        XCTAssertEqual(toggles.map { $0["checked"] as? Bool }, [true, false, true])
+    }
+
+    /// Nothing listens in Quick Look, so its checkboxes stay inert.
+    func test_withoutAListener_checkboxesStayDisabled() throws {
+        for shell in [Shell.app, Shell.quickLook] {
+            loader = Loader()
+            let json = try XCTUnwrap(try render(Self.taskMarkdown, in: shell, then: Self.clickCheckboxProbe) as? String)
+            let result = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+            XCTAssertEqual(result["enabled"] as? [Bool], [false, false, false], shell.rawValue)
+            XCTAssertEqual(result["checkedNow"] as? [Bool], [false, true, false], "clicks change nothing in \(shell.rawValue)")
+            XCTAssertNil(result["toggles"] as? [Any], shell.rawValue)
+        }
+    }
+
+    /// A removed item in a comparison has no source line; its checkbox is
+    /// still live but a click on it must not report anything.
+    func test_clickingARemovedItemsCheckbox_reportsNothing() throws {
+        loader = Loader(userScript: Self.taskHandlerStub)
+        let before = "- [ ] kept\n- [ ] dropped\n"
+        let after = "- [ ] kept\n"
+        let probe = """
+        (function () {
+          var removed = document.querySelector('#content .diff-block-removed input[type=checkbox]');
+          if (removed) removed.click();
+          var kept = document.querySelector('#content li[data-source-line] input[type=checkbox]');
+          if (kept) kept.click();
+          return JSON.stringify({ removed: !!removed, toggles: window.__toggles });
+        })()
+        """
+        let json = try XCTUnwrap(try render(after, comparedWith: before, then: probe) as? String)
+        let result = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+        XCTAssertEqual(result["removed"] as? Bool, true, "the fixture produced a removed task item")
+        let toggles = try XCTUnwrap(result["toggles"] as? [[String: Any]])
+        XCTAssertEqual(toggles.count, 1)
+        XCTAssertEqual(toggles.first?["line"] as? Int, 0)
     }
 
     func test_scriptTagsInMarkdown_areStripped() throws {

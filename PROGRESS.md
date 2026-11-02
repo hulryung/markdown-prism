@@ -42,7 +42,9 @@ Native shell, web renderer:
   event is swallowed so the strip that already worked does not act twice.
 - **Swift → JS**: markdown is JSON-encoded and passed to `window.renderMarkdown`,
   or to `window.renderDiff` with the version to mark it against.
-- **JS → Swift**: `WKScriptMessageHandler` for link clicks and preview scroll position.
+- **JS → Swift**: `WKScriptMessageHandler` for link clicks, preview scroll
+  position and task checkbox clicks (`TaskListToggle` turns the latter into a
+  one-character edit of the source line).
 - **Rendering logic** lives in `Resources/js/preview.js` and `js/diff.js`, shared
   by two shells:
   - `preview.html` — in-app preview, allows remote images.
@@ -114,6 +116,11 @@ Tests/MarkdownPrismTests/
 ## Implemented
 
 - GFM rendering: tables, task lists, strikethrough, autolinks, emoji
+- Clicking a rendered task checkbox edits the `[ ]`/`[x]` on its source line.
+  The edit goes through the editor's text view so it can be undone; with the
+  editor hidden the document is changed directly. Quick Look, which has no
+  message handler to tell, keeps its checkboxes inert, and a removed item in
+  a comparison has no source line to edit
 - Syntax highlighting (highlight.js), LaTeX (KaTeX), Mermaid diagrams
 - Document-based: multiple windows and native tabs, each with its own document
 - Launching with nothing open shows the welcome sample; File > New is empty
