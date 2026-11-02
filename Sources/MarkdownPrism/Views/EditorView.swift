@@ -135,6 +135,44 @@ struct EditorView: NSViewRepresentable {
             )
         }
 
+        // The view is rich text so the highlighter can colour it, but the
+        // document is plain Markdown. Left alone, a paste from a browser lands
+        // as styled runs that the highlighter never clears (#16), and a copy
+        // hands other apps an RTF rendering they prefer over the Markdown,
+        // which is where the blank lines in #17 came from. Only the plain
+        // string crosses the pasteboard in either direction.
+
+        override var writablePasteboardTypes: [NSPasteboard.PasteboardType] {
+            [.string]
+        }
+
+        override func writeSelection(to pboard: NSPasteboard, types: [NSPasteboard.PasteboardType]) -> Bool {
+            guard types.contains(.string) else { return false }
+            let text = selectedRanges
+                .compactMap { ($0 as? NSRange).map { (string as NSString).substring(with: $0) } }
+                .joined(separator: "\n")
+            return pboard.setString(text, forType: .string)
+        }
+
+        override func readSelection(from pboard: NSPasteboard) -> Bool {
+            insertPlainText(from: pboard)
+        }
+
+        override func readSelection(from pboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
+            insertPlainText(from: pboard)
+        }
+
+        /// Inserts the pasteboard's text, falling back to the characters of a
+        /// rich representation when no plain string was offered.
+        @discardableResult
+        func insertPlainText(from pboard: NSPasteboard) -> Bool {
+            let text = pboard.string(forType: .string)
+                ?? (pboard.readObjects(forClasses: [NSAttributedString.self])?.first as? NSAttributedString)?.string
+            guard let text else { return false }
+            insertText(text, replacementRange: selectedRange())
+            return true
+        }
+
         override func cancelOperation(_ sender: Any?) {
             if let onEscape = coordinator?.parent.onEscapePressed {
                 onEscape()
