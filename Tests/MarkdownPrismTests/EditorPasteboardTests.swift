@@ -80,4 +80,24 @@ final class EditorPasteboardTests: XCTestCase {
         XCTAssertFalse(types.contains(.html), "\(types)")
         XCTAssertEqual(pasteboard.string(forType: .string), markdown)
     }
+
+    func test_copyingIntoAnOccupiedPasteboard_replacesItsContentsAndDeclaresPlainText() throws {
+        let rich = richMarkdown()
+        let rtf = try XCTUnwrap(rich.rtf(from: NSRange(location: 0, length: rich.length), documentAttributes: [:]))
+        pasteboard.declareTypes([.string, .rtf], owner: nil)
+        XCTAssertTrue(pasteboard.setString("previous clipboard text", forType: .string))
+        XCTAssertTrue(pasteboard.setData(rtf, forType: .rtf))
+        let previousChangeCount = pasteboard.changeCount
+
+        let selection = "**한글 🚀**\n\n- item"
+        let markdown = "# Title\n\n\(selection)\n"
+        let textView = editor(markdown)
+        textView.setSelectedRange((markdown as NSString).range(of: selection))
+
+        XCTAssertTrue(textView.writeSelection(to: pasteboard, types: textView.writablePasteboardTypes))
+
+        XCTAssertGreaterThan(pasteboard.changeCount, previousChangeCount)
+        XCTAssertFalse(pasteboard.types?.contains(.rtf) ?? false)
+        XCTAssertEqual(pasteboard.string(forType: .string), selection)
+    }
 }

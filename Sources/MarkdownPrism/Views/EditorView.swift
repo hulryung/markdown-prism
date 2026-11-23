@@ -156,6 +156,9 @@ struct EditorView: NSViewRepresentable {
             let text = selectedRanges
                 .compactMap { ($0 as? NSRange).map { (string as NSString).substring(with: $0) } }
                 .joined(separator: "\n")
+            // This override bypasses AppKit's declaration step. Claim fresh
+            // ownership so the previous clipboard contents are replaced.
+            pboard.declareTypes([.string], owner: nil)
             return pboard.setString(text, forType: .string)
         }
 
